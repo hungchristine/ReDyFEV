@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Reads in the raw data fetched from ENTSO-E Transparency Platform, and fills in missing data
+ Reads in the raw data fetched from ENTSO-E Transparency Platform, refactors the
+ data and fills in missing data
 """
 import pandas as pd
 import numpy as np
@@ -9,9 +10,9 @@ import pickle
 import os, sys
 
 ## Load previous results
-with open('entso_export_gen_final.pkl', 'rb') as handle:
+with open(r'code output/entso_export_gen.pkl', 'rb') as handle:
     trade_dict = pickle.load(handle)
-with open('entso_export_trade_final.pkl', 'rb') as handle:
+with open(r'code output/entso_export_trade.pkl', 'rb') as handle:
     gen_dict = pickle.load(handle)
     
 #%%
@@ -80,7 +81,7 @@ gen_df = pd.DataFrame.from_dict(summed_gen, orient='index')
     production from 2018)
 """
 
-new_ie = pd.read_csv(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\gen_IE.csv')
+new_ie = pd.read_csv(r'Data/gen_IE.csv')
 new_ie = new_ie.set_index('MTU',drop=True,append=False).drop('Area',axis=1)
 new_ie = new_ie.replace('n/e',np.nan)
 new_ie = (new_ie*0.5).sum()/1e6
@@ -103,9 +104,9 @@ add_countries = list(set(trade_df.index)-set(gen_df.index))
 for country in add_countries:
     gen_df.loc[country] = 0
 
-with open('trade_final.pkl', 'wb') as handle:
+with open(r'code output/trade_final.pkl', 'wb') as handle:
     pickle.dump(trade_df, handle)
-with open('gen_final.pkl', 'wb') as handle:
+with open(r'code output/gen_final.pkl', 'wb') as handle:
     pickle.dump(gen_df, handle)
 
 #%%
