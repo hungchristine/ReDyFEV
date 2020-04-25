@@ -1,28 +1,27 @@
 
 # coding: utf-8
 
-# # Mapping of production and consumption mixes in Europe and their effect on carbon footprint of electric vehicles
+"""Mapping of production and consumption mixes in Europe and their effect on 
+the carbon footprint of electric vehicles
 
-# <a id="home"></a>
+ This code performs the following:
+ -  Import data from ENTSO-E (production quantities, trades relationships)
+ -  Calculates the production and consumption electricity mixes for European countries
+ -  Calculates the carbon footprint (CF) for the above electricity mixes](#CF_el)
+ -  Calculates the production, use-phase and end-of-life emissions for battery electric vehicles (BEVs) under the following assumptions:](#BEV_calcs)
+     -  Production in Korea (with electricity intensity 684 g CO2-eq/kWh)
+     -  Use phase uses country-specific production and consumption mix
+     -  End-of-life emissions static for all countries
 
-# This code performs the following stpdf:
-# -  Import data from ENTSO-E (production quantities, trades relationships)
-# -  Calculates the production and consumption electricity mixes for European countries
-# -  Calculates the carbon footprint (CF) for the above electricity mixes](#CF_el)
-# -  Calculates the production, use-phase and end-of-life emissions for battery electric vehicles (BEVs) under the following assumptions:](#BEV_calcs)
-#     -  Production in Korea (with electricity intensity 684 g CO2-eq/kWh)
-#     -  Use phase uses country-specific production and consumption mix
-#     -  End-of-life emissions static for all countries
-
-# Requires the following files for input:
-#	  - ENTSO_production_volumes.csv (from bentso.py)
-#	  - final_emission_factors.csv (from bentso.py)
-#	  - trades.csv (from bentso.py)
-#	  - trade_ef_hv.csv (from bentso.py)
-#	  - API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv (transmission losses, from OECD)
-#     - car_specifications.xlsx
-#	  - road_eqs_carage.xls
-#   
+ Requires the following files for input:
+	  - ENTSO_production_volumes.csv (from hybridized_impact_factors.py)
+	  - final_emission_factors.csv (from hybridized_impact_factors.py)
+	  - trades.csv (from hybridized_impact_factors.py)
+	  - trade_ef_hv.csv (from hybridized_impact_factors.py)
+	  - API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv (transmission losses, from OECD)
+     - car_specifications.xlsx
+	  - road_eqs_carage.xls
+"""
 #%%
 
 import os
@@ -37,17 +36,19 @@ export_figures = True
 include_TD_losses = True
 
 #%%
-
 fp = os.path.curdir
-fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
-fp_results = os.path.join(os.path.pardir, os.path.pardir, 'Results')
-fp_figure = os.path.join(fp_results, 'Figures')
+fp_data = os.path.join(fp, 'data')
+fp_output = os.path.join(fp, 'code output')
+fp_results = os.path.join(fp, 'results')
+#fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
+#fp_results = os.path.join(os.path.pardir, os.path.pardir, 'Results')
+fp_figure = os.path.join(fp_results, 'figures')
 
 # Output from bentso.py
-filepath_production = os.path.join(fp, 'ENTSO_production_volumes.csv')
-filepath_intensities = os.path.join(fp, 'final_emission_factors.csv')
-filepath_trades = os.path.join(fp, 'trades.csv')
-filepath_tradeonly_ef = os.path.join(fp, 'AL_HR_LU_TR_ef_hv.csv')
+filepath_production = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
+filepath_intensities = os.path.join(fp_output, 'final_emission_factors.csv')
+filepath_trades = os.path.join(fp_output, 'trades.csv')
+filepath_tradeonly_ef = os.path.join(fp_output, 'AL_HR_LU_TR_ef_hv.csv')
 
 
 #%%
@@ -123,20 +124,18 @@ C.sort_index(axis=0, inplace=True)
 # # Calculate technology characterization factors including transmission and distribution losses
 # First, read transmission and distribution losses, downloaded from World Bank economic indicators (most recent values from 2014)
 losses_fp = os.path.join(fp_data, 'API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv')
-TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1,58], index_col=0)
-TD_losses = TD_losses.iloc[:,-7:].dropna(how='all', axis=1)
+try:
+    TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1,58], index_col=0)
+    TD_losses = TD_losses.iloc[:,-7:].dropna(how='all', axis=1)
+    TD_losses = TD_losses.apply(lambda x: x/100+1) # convert losses to a multiplicative factor
 
-#%%
-
-TD_losses = TD_losses.apply(lambda x: x/100+1) # convert losses to a multiplicative factor
-
-#%%
-
-# ## Calculate total national carbon emissions from el  - production and consumption mixes
-
-TD_losses.index = coco.convert(names=TD_losses.index.tolist(), to='ISO2', not_found=None)
-TD_losses = TD_losses.loc[countries]
-TD_losses = pd.Series(TD_losses.iloc[:,0])
+    # ## Calculate total national carbon emissions from el  - production and consumption mixes
+    TD_losses.index = coco.convert(names=TD_losses.index.tolist(), to='ISO2', not_found=None)
+    TD_losses = TD_losses.loc[countries]
+    TD_losses = pd.Series(TD_losses.iloc[:,0])
+except:
+    display("Warning! Transmission and distribution losses input files not found!")
+    TD_losses = pd.Series(np.zeros(len(production.index)), index=production.index)
 
 
 #%%
@@ -229,14 +228,12 @@ CFCI_TD_losses = CFCI_no_TD.multiply(TD_losses, axis=0).dropna(how='any', axis=0
 #%%
 
 # Transpose added after removing country aggregation as data pre-treatment
-if include_TD_losses == True:
+if include_TD_losses:
     CFPI = CFPI_TD_losses
     CFCI = CFCI_TD_losses
 else:
     CFPI = CFPI_no_TD
     CFCI = CFCI_no_TD
-
-
 
 #%%
 
@@ -253,9 +250,6 @@ country_total_cons_disagg.index = original_countries
 rCP = np.divide(CFCI, CFPI)
 rCP.columns = ["ratio consumption:production mix"]
 
-# [Go home](#home)
-
-
 #%%
 
 # # BEV calculations
@@ -268,7 +262,7 @@ lifetime = 180000 # vehicle lifetime in km
 production_el_intensity = 684 # Korean el-mix 684 g CO2/kWh, from ecoinvent
 
 # read in data
-vehicle_fp = os.path.join(fp_data, 'car_specifications - feb 2020.xlsx')
+vehicle_fp = os.path.join(fp_data, 'car_specifications.xlsx')
 cars = pd.read_excel(vehicle_fp, index_col=[0,1,2], usecols='A:G', skipfooter=28)
 
 #%%
@@ -297,7 +291,6 @@ BEV_prod_EU.columns = pd.MultiIndex.from_product([["EUR production impacts BEV"]
 #%%
 
 # ### BEV use phase calculations
-
 elmixes = (CFPI.copy()).join(CFCI.copy()).T
 
 #%%
@@ -514,22 +507,22 @@ writer.save()
 #%%
 
 # Export for figures
-keeper = 'country-specific indirect'
-results.to_pickle(keeper+'_BEV.pkl')
-CFEL.to_pickle(keeper+'_el.pkl')
-BEV_impactsc.to_pickle(keeper+'_BEV_impacts_consumption.pkl')
-ICEV_total_impacts.to_pickle(keeper+'_ICEV_impacts.pkl')
+
+keeper = fp_output + 'country-specific indirect'
+results.to_pickle(keeper + '_BEV.pkl')
+CFEL.to_pickle(keeper + '_el.pkl')
+BEV_impactsc.to_pickle(keeper + '_BEV_impacts_consumption.pkl')
+ICEV_total_impacts.to_pickle(keeper + '_ICEV_impacts.pkl')
 
 #%%
 # Extra calculations
 
-BEV_total_use = BEV_use*lifetime/1e6  #absolute lifetime operation emissions
+BEV_total_use = BEV_use * lifetime / 1e6  #absolute lifetime operation emissions
 
 
 #%%
 
 # Export intermediate variables from calculations for troubleshooting
-
 if export_data == True:
     keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
     codecheck_file = os.path.join(fp_results,'code_check_'+keeper+'.xlsx')
