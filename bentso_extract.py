@@ -2,7 +2,7 @@
 """
  Retrieve data from ENTSO-E Transparency Platform
  Export
-""""
+"""
 
 import appdirs
 import hashlib
