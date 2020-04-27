@@ -38,7 +38,7 @@ include_TD_losses = True
 #%%
 fp = os.path.curdir
 fp_data = os.path.join(fp, 'data')
-fp_output = os.path.join(fp, 'code output')
+fp_output = os.path.join(fp, 'output')
 fp_results = os.path.join(fp, 'results')
 #fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
 #fp_results = os.path.join(os.path.pardir, os.path.pardir, 'Results')
@@ -125,7 +125,7 @@ C.sort_index(axis=0, inplace=True)
 # First, read transmission and distribution losses, downloaded from World Bank economic indicators (most recent values from 2014)
 losses_fp = os.path.join(fp_data, 'API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv')
 try:
-    TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1,58], index_col=0)
+    TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1, 58], index_col=0)
     TD_losses = TD_losses.iloc[:,-7:].dropna(how='all', axis=1)
     TD_losses = TD_losses.apply(lambda x: x/100+1) # convert losses to a multiplicative factor
 
@@ -508,11 +508,17 @@ writer.save()
 
 # Export for figures
 
-keeper = fp_output + 'country-specific indirect'
+fp = os.path.abspath(os.path.curdir)
+fp_output = os.path.join(os.path.curdir, 'output')
+os.chdir(fp_output)
+
+keeper = 'country-specific indirect'
 results.to_pickle(keeper + '_BEV.pkl')
 CFEL.to_pickle(keeper + '_el.pkl')
 BEV_impactsc.to_pickle(keeper + '_BEV_impacts_consumption.pkl')
 ICEV_total_impacts.to_pickle(keeper + '_ICEV_impacts.pkl')
+
+os.chdir(fp)
 
 #%%
 # Extra calculations
