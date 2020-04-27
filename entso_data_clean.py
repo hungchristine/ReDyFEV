@@ -6,11 +6,16 @@
 import pandas as pd
 import numpy as np
 import pickle
+import os
+
+fp = os.path.abspath(os.path.curdir)
+fp_output = os.path.join(os.path.curdir, 'output')
+os.chdir(fp_output)
 
 ## Load previous results
-with open(r'code output/entso_export_gen.pkl', 'rb') as handle:
+with open(r'entso_export_trade.pkl', 'rb') as handle:
     trade_dict = pickle.load(handle)
-with open(r'code output/entso_export_trade.pkl', 'rb') as handle:
+with open(r'entso_export_gen.pkl', 'rb') as handle:
     gen_dict = pickle.load(handle)
     
 #%%
@@ -63,7 +68,7 @@ def build_trade_mat(trade_dict):
     return trade_mat
 
 
-#%%
+ #%%
 generation = gen_dict.copy()
 trade = trade_dict.copy()
 
@@ -79,10 +84,11 @@ gen_df = pd.DataFrame.from_dict(summed_gen, orient='index')
     production from 2018)
 """
 
-new_ie = pd.read_csv(r'Data/gen_IE.csv')
-new_ie = new_ie.set_index('MTU',drop=True,append=False).drop('Area',axis=1)
-new_ie = new_ie.replace('n/e',np.nan)
-new_ie = (new_ie*0.5).sum()/1e6
+fp_ie = os.path.join(fp, 'data','gen_IE.csv')
+new_ie = pd.read_csv(fp_ie)
+new_ie = new_ie.set_index('MTU', drop=True, append=False).drop('Area', axis=1)
+new_ie = new_ie.replace('n/e', np.nan)
+new_ie = (new_ie*0.5).sum()/1e6 # samples on the half hour
 new_ie = new_ie.drop(index='Marine  - Actual Aggregated [MW]')
 new_ie.index = gen_df.columns
 
@@ -102,7 +108,9 @@ add_countries = list(set(trade_df.index)-set(gen_df.index))
 for country in add_countries:
     gen_df.loc[country] = 0
 
-with open(r'code output/trade_final.pkl', 'wb') as handle:
+with open(r'trade_final.pkl', 'wb') as handle:
     pickle.dump(trade_df, handle)
-with open(r'code output/gen_final.pkl', 'wb') as handle:
+with open(r'gen_final.pkl', 'wb') as handle:
     pickle.dump(gen_df, handle)
+    
+os.chdir(fp)

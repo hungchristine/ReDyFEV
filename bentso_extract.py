@@ -18,8 +18,10 @@ from bentso import CachingDataClient
 
 
 cl = CachingDataClient(location=r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4E UR\X00 EurEVFootprints\Data\bentso')
-
 #os.environ['ENTSOE_API_TOKEN'] = '52585baf-3014-41c2-92f8-11bfc769343b' #<insert ENTSO-E API token here>
+fp = os.path.abspath(os.path.curdir)
+fp_output = os.path.join(os.path.curdir, 'output')
+os.chdir(fp_output)
 
 # #### Using Bentso
 
@@ -34,7 +36,7 @@ country_list = ['AL', 'AT', 'BA', 'BE', 'BG',
                 'BY','UA','MD','RU','MT', 'MD']
 
 # smaller group for testing
-#country_list = ['DE','FR','DK','IT']
+#country_list = ['DE','FR']#,'DK','IT']
 
 """Fetch production mixes from Transparency Platform
    saves as dict of Dataframes.
@@ -53,10 +55,10 @@ def fetch_generation():
     gen_dict={}
     for country in country_list:
         try:
-            gen_dict[country] = cl.get_generation(country,2019, full_year=True)
+            gen_dict[country] = cl.get_generation(country, 2019, full_year=True)
         except:
             print(f'Warning: no data for generation in {country}!')
-    with open(r'code output/entso_export_gen.pkl', 'wb') as handle:
+    with open(r'entso_export_gen.pkl', 'wb') as handle:
         pickle.dump(gen_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     return gen_dict
 
@@ -72,14 +74,17 @@ def fetch_trade():
     for exp_country in country_list:
         for imp_country in country_list:
             try:
-                trade_dict[(exp_country,imp_country)] = cl.get_trade(exp_country,imp_country,2019, full_year=True)
+                trade_dict[(exp_country, imp_country)] = cl.get_trade(
+                        exp_country, imp_country,2019, full_year=True)
             except:
                 print(f'Warning: {imp_country}-{exp_country} trade relationship does not exist!')
-                trade_dict[(exp_country,imp_country)] = np.nan
-                no_trade_rel.append((exp_country,imp_country))
-    with open(r'code output/entso_export_trade.pkl', 'wb') as handle:
+                trade_dict[(exp_country, imp_country)] = np.nan
+                no_trade_rel.append((exp_country, imp_country))
+    with open(r'entso_export_trade.pkl', 'wb') as handle:
         pickle.dump(trade_dict, handle)
     return trade_dict
 
 gen_dict = fetch_generation()
 trade_dict = fetch_trade()
+
+os.chdir(fp)

@@ -5,6 +5,9 @@ import numpy as np
 import os, sys
 import pickle
      
+fp_results = os.path.join(os.path.curdir,'results')
+fp_output = os.path.join(os.path.curdir,'output')
+
 def hybrid_emission_factors(entso_e_production): 
     # append pylcaio folder with hybridized LCI processes
     sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
@@ -37,7 +40,8 @@ def hybrid_emission_factors(entso_e_production):
     D_labels = D_labels.loc['EDIP; environmental impact; global warming, GWP 100a; kg CO2-Eq']
     
     # the footprint of all hybridized processes from ecoinvent, with their original footprint
-    hybrid_results = pd.read_excel(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\Results_full_database_STAM_2011.xlsx','GWP_only_hyb', usecols='A:E,G', index_col=[0,1,2,3,4])
+    fp_hybrid = os.path.join(os.path.curdir, 'data', 'Results_full_database_STAM_2011.xlsx')
+    hybrid_results = pd.read_excel(fp_hybrid,'GWP_only_hyb', usecols='A:E,G', index_col=[0,1,2,3,4])
     
     # ## List of ENTSO-E countries
     country_list = ['AL','AT','BA','BE','BG','CH','CZ','DE','DK','EE',
@@ -312,7 +316,7 @@ def hybrid_emission_factors(entso_e_production):
     hv_mix_ef = hv_mix_ef * 1000
     trade_mixes_comp = trade_mixes_comp * 1000
     
-    os.path.join(os.path.curdir,'Results')
+    fp_results = os.path.join(os.path.curdir,'results')
     
     with pd.ExcelWriter ('hybrid_emission_factors_final.xlsx') as writer:
         ef_countries.to_excel(writer, sheet_name='country_emission_factors')
@@ -322,22 +326,23 @@ def hybrid_emission_factors(entso_e_production):
         trade_mixes_comp.to_excel(writer, sheet_name='trade_mixes_from_ei')
         ei_tec_table.to_excel(writer,sheet_name='correspondence table')
     
-    ef_countries.to_csv('country_emission_factors.csv')
-    no_ef.to_csv('missing_emission_factors.csv')
-    lv_mix_ef.to_csv('AL_HR_LU_TR_ef_lv.csv') # used in BEV_footprints_calculations
-    hv_mix_ef.to_csv('AL_HR_LU_TR_ef_hv.csv') # used in BEV_footprints_calculations
+    ef_countries.to_csv(os.path.join(fp_results, 'country_emission_factors.csv'))
+    no_ef.to_csv(os.path.join(fp_results,'missing_emission_factors.csv'))
+    lv_mix_ef.to_csv(os.path.join(fp_results,'AL_HR_LU_TR_ef_lv.csv')) # used in BEV_footprints_calculations
+    hv_mix_ef.to_csv(os.path.join(fp_results,'AL_HR_LU_TR_ef_hv.csv'))# used in BEV_footprints_calculations
 
     # Calculate mean technology footprints as quick check
+    print(type())
     ef_aggregated.replace(0,np.nan).mean(axis=1)
     
     return  ef_countries, no_ef
     
 
-with open(r'code output/gen_final.pkl', 'rb') as handle:
+with open(os.path.join(fp_output, 'gen_final.pkl'), 'rb') as handle:
         gen_df = pickle.load(handle)
 gen_df.replace(0, np.nan,inplace=True)
     
-with open(r'code output/trade_final.pkl', 'rb') as handle:
+with open(os.path.join(fp_output,'trade_final.pkl'), 'rb') as handle:
     trade_df = pickle.load(handle)
 
 try:
@@ -346,8 +351,8 @@ try:
 
 except:
     # import ready-calculated emission factors if no access to pylcaio object
-    ef = pd.read_csv(r'code output/country_emission_factors.csv', index_col=[0])
-    missing_factors = pd.read_csv(r'code output/missing_emission_factors.csv', index_col=[0])
+    ef = pd.read_csv(os.path.join(fp_output,'country_emission_factors.csv'), index_col=[0])
+    missing_factors = pd.read_csv(os.path.join(fp_output,'missing_emission_factors.csv'), index_col=[0])
 
 """ Fix missing emission factors """
 # Note that these disregard whether or not there is actual production
@@ -417,9 +422,10 @@ sort_indices(ef)
 
 # Export all data
 # .csv for use in BEV_footprints_calculations.py
-trade_df.to_csv(r'code output/trades.csv')
-gen_df.to_csv(r'code output/ENTSO_production_volumes.csv')
-ef.to_csv(r'code output/final_emission_factors.csv')
+
+trade_df.to_csv(os.path.join(fp_results,'trades.csv'))
+gen_df.to_csv(os.path.join(fp_results,'ENTSO_production_volumes.csv'))
+ef.to_csv(os.path.join(fp_results,'final_emission_factors.csv'))
 
 with pd.ExcelWriter('entsoe_export_final_long.xlsx') as writer:
     trade_df.to_excel(writer, 'trade')
