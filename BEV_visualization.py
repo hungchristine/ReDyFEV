@@ -53,9 +53,10 @@ export_figures = True
 include_TD_losses = True
 
 fp = os.path.curdir
-fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
-fp_results = os.path.join(os.path.pardir, 'Results')
-fp_figure = os.path.join(fp_results, 'Figures')
+fp_data = os.path.join(fp, 'data')
+fp_output = os.path.join(fp, 'output')
+fp_results = os.path.join(fp, 'results')
+fp_figure = os.path.join(fp_results, 'figures')
 
 if not os.path.exists(fp_results):
     os.mkdir(fp_results)
@@ -64,33 +65,21 @@ if not os.path.exists(fp_figure):
 
 # %%
 
-try:
-    CFEL
-except NameError:
-    fp_pkl = os.path.join(os.path.curdir,
-                          'country-specific indirect_el.pkl')
-    CFEL = pickle.load(open(fp_pkl, 'rb'))
+fp_pkl = os.path.join(fp_output,
+                      'country-specific indirect_el.pkl')
+CFEL = pickle.load(open(fp_pkl, 'rb'))
 
-try:
-    results
-except NameError:
-    fp_pkl = os.path.join(os.path.curdir,
-                          'country-specific indirect_BEV.pkl')
-    results = pickle.load(open(fp_pkl, 'rb'))
+fp_pkl = os.path.join(fp_output,
+                      'country-specific indirect_BEV.pkl')
+results = pickle.load(open(fp_pkl, 'rb'))
 
-try:
-    BEV_impactsc
-except NameError:
-    fp_pkl = os.path.join(os.path.curdir,
-                          'country-specific indirect_BEV_impacts_consumption.pkl')
-    BEV_impactsc = pickle.load(open(fp_pkl, 'rb'))
+fp_pkl = os.path.join(fp_output,
+                      'country-specific indirect_BEV_impacts_consumption.pkl')
+BEV_impactsc = pickle.load(open(fp_pkl, 'rb'))
 
-try:
-    ICEV_total_impacts
-except NameError:
-    fp_pkl = os.path.join(os.path.curdir,
-                          'country-specific indirect_ICEV_impacts.pkl')
-    ICEV_total_impacts = pickle.load(open(fp_pkl, 'rb'))
+fp_pkl = os.path.join(fp_output,
+                      'country-specific indirect_ICEV_impacts.pkl')
+ICEV_total_impacts = pickle.load(open(fp_pkl, 'rb'))
 
 
 # %%
@@ -318,8 +307,8 @@ def fig1_generator(axis_type, size_ind, marker_clr, net_trade=None, xlim=None, y
     plt.tight_layout()
     if export_figures:
         keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig1-' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig 1 -' + keeper + '.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_1-' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_1 -' + keeper + '.png'), bbox_inches='tight')
 
 # %%
 
@@ -518,8 +507,8 @@ if export_figures:
 
 # # Begin mapping
 
-# Load map shapefile
-fp_map = os.path.join(fp_data, os.path.pardir, 'maps', 'ne_10m_admin_0_countries.shp')
+# Load map shapefile; file from Natural Earth
+fp_map = os.path.join(fp_data, 'maps', 'ne_10m_admin_0_countries.shp')
 
 country_shapes = gpd.read_file(fp_map)
 europe_shapes = country_shapes[(country_shapes.CONTINENT == "Europe")]  # restrict to Europe
@@ -569,7 +558,7 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
 
 # Helper function for annotating maps
 
-fp_label_pos = os.path.join(os.path.curdir, 'label_pos.csv')
+fp_label_pos = os.path.join(fp_data, 'label_pos.csv')
 label_pos = pd.read_csv(fp_label_pos, index_col=[0, 1], skiprows=0, header=0)  # read in coordinates for label/annotation positions
 lined_countries = ['PT', 'BE', 'NL', 'DK', 'SI', 'GR', 'ME', 'MK', 'EE', 'LV', 'BA', 'CH']  # countries using leader lines
 
