@@ -263,7 +263,7 @@ production_el_intensity = 684 # Korean el-mix 684 g CO2/kWh, from ecoinvent
 
 # read in data
 vehicle_fp = os.path.join(fp_data, 'car_specifications.xlsx')
-cars = pd.read_excel(vehicle_fp, index_col=[0,1,2], usecols='A:G', skipfooter=28)
+cars = pd.read_excel(vehicle_fp, index_col=[0,1,2], usecols='A:G')
 
 #%%
 

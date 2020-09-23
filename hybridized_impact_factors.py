@@ -318,7 +318,7 @@ def hybrid_emission_factors(entso_e_production):
     
     fp_results = os.path.join(os.path.curdir,'results')
     
-    with pd.ExcelWriter ('hybrid_emission_factors_final.xlsx') as writer:
+    with pd.ExcelWriter(os.path.join(fp_results, 'hybrid_emission_factors_final.xlsx')) as writer:
         ef_countries.to_excel(writer, sheet_name='country_emission_factors')
         no_ef.to_excel(writer, sheet_name='missing_emission_factors')
         lv_mix_ef.to_excel(writer, sheet_name='AL_HR_LU_TR ef')
@@ -423,11 +423,12 @@ sort_indices(ef)
 # Export all data
 # .csv for use in BEV_footprints_calculations.py
 
-trade_df.to_csv(os.path.join(fp_results,'trades.csv'))
-gen_df.to_csv(os.path.join(fp_results,'ENTSO_production_volumes.csv'))
-ef.to_csv(os.path.join(fp_results,'final_emission_factors.csv'))
+trade_df.to_csv(os.path.join(fp_output,'trades.csv'))
+gen_df.to_csv(os.path.join(fp_output,'ENTSO_production_volumes.csv'))
+ef.to_csv(os.path.join(fp_output,'final_emission_factors.csv'))
 
-with pd.ExcelWriter('entsoe_export_final_long.xlsx') as writer:
+
+with pd.ExcelWriter(os.path.join(fp_results, 'entsoe_export_final.xlsx')) as writer:
     trade_df.to_excel(writer, 'trade')
     gen_df.to_excel(writer, 'generation')
     ef.to_excel(writer,'new ef')
