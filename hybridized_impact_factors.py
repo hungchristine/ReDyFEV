@@ -1,3 +1,5 @@
+# The original code requires pylcaio, from Agez, found at:
+# https://github.com/MaximeAgez/pylcaio
 import pandas as pd
 import numpy as np
 import os, sys
@@ -22,14 +24,13 @@ def hybrid_emission_factors(entso_e_production):
     I = pd.DataFrame(np.eye(len(Analysis.A_ff)), Analysis.A_ff.index, Analysis.A_ff.columns)
     X = pd.DataFrame(np.linalg.solve(I-Analysis.A_ff, I), Analysis.A_ff.index, I.columns) # pro x pro
     D = Analysis.C_f.fillna(0).dot(Analysis.F_f).dot(X) # pro x imp
-    # F_f, str x pro
-    # C_f imp x str
     
     D = D.T
     D_labels = labels.join(D, how='inner')
     D_labels.set_index(keys=['activityName','geography','productName'], append=True, inplace=True)
     D_labels = D_labels.iloc[:, 19:]
     D_labels = D_labels.T
+    
     # Other possible impact methods
     imp_list = ['EDIP; environmental impact; global warming, GWP 100a; kg CO2-Eq', 'ReCiPe Midpoint (H); climate change; GWP100; kg CO2-Eq', 'ReCiPe Midpoint (H) V1.13; climate change; GWP100; kg CO2-Eq', 'IPCC 2013; climate change; GTP 100a; kg CO2-Eq']
     D_labels_comp = D_labels.loc[imp_list]
@@ -323,28 +324,14 @@ def hybrid_emission_factors(entso_e_production):
     
     ef_countries.to_csv('country_emission_factors.csv')
     no_ef.to_csv('missing_emission_factors.csv')
-    lv_mix_ef.to_csv('AL_HR_LU_TR_ef_lv.csv')
-    hv_mix_ef.to_csv('AL_HR_LU_TR_ef_hv.csv')
+    lv_mix_ef.to_csv('AL_HR_LU_TR_ef_lv.csv') # used in BEV_footprints_calculations
+    hv_mix_ef.to_csv('AL_HR_LU_TR_ef_hv.csv') # used in BEV_footprints_calculations
 
     # Calculate mean technology footprints as quick check
     ef_aggregated.replace(0,np.nan).mean(axis=1)
     
-    return  ef_countries, hv_mix_ef, no_ef
+    return  ef_countries, no_ef
     
-
-"""
-fp_dir = os.path.join(os.path.curdir,os.path.pardir,'Results')
-sys.path.append(fp_dir)
-fp = os.path.join(fp_dir, 'hybrid_emission_factors_final.xlsx')
-
-ef = pd.read_excel(fp, sheet_name = 'country_emission_factors', index_col=[0], header=[0])
-trade_efs = pd.read_excel(fp, sheet_name = 'trade ef_hv', index_col=[0,1,2,3], header=[0])"""
-
-"""ef = ef_countries.copy()
-trade_efs = hv_mix_ef.copy()
-missing_factors =  no_ef.copy()
-gen_df = entso_e_production #pd.read_csv(r'/code output/ENTSO_production_volumes.csv')"""
-
 
 with open('gen_final.pkl', 'rb') as handle:
         gen_df = pickle.load(handle)
@@ -355,15 +342,12 @@ with open('trade_final.pkl', 'rb') as handle:
 
 try:
     # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
-    ef, trade_efs, missing_factors = hybrid_emission_factors(gen_df)
+    ef, missing_factors = hybrid_emission_factors(gen_df)
 
 except:
     # import ready-calculated emission factors if no access to pylcaio object
     ef = pd.read_csv('country_emission_factors.csv', index_col=[0])
     missing_factors = pd.read_csv('missing_emission_factors.csv', index_col=[0])
-    #lv_mix_ef.read_csv('AL_HR_LU_TR_ef_lv.csv', index_col=[0])
-    trade_efs = pd.read_csv('AL_HR_LU_TR_ef_hv.csv', index_col=[0])
-
 
 """ Fix missing emission factors """
 # Note that these disregard whether or not there is actual production
@@ -424,8 +408,8 @@ ef['other renewable'] = (ef*other_renew_wf).sum(axis=1)
 
 # Sort the indices of production, rtade and emission factor matrices before exxport
 def sort_indices(df):
-    df.sort_index(axis=0,inplace=True)
-    df.sort_index(axis=1,inplace=True)
+    df.sort_index(axis=0, inplace=True)
+    df.sort_index(axis=1, inplace=True)
     
 sort_indices(trade_df)
 sort_indices(gen_df)

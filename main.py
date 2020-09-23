@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Apr 21 12:35:51 2020
-
-@author: chrishun
+This script runs the data extraction, data cleaning, calculations and visualization
+scripts used in "Regionalized footprints of battery electric vehicles in Europe"
+ 
 """
 
 
-#import bentso_extract
+import bentso_extract
 import entso_data_clean
 import hybridized_impact_factors
 import BEV_footprints_calculations
