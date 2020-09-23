@@ -37,15 +37,18 @@ include_TD_losses = True
 
 #%%
 fp = os.path.curdir
-fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
-fp_results = os.path.join(os.path.pardir, os.path.pardir, 'Results')
-fp_figure = os.path.join(fp_results, 'Figures')
+fp_data = os.path.join(fp, 'data')
+fp_output = os.path.join(fp, 'output')
+fp_results = os.path.join(fp, 'results')
+#fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
+#fp_results = os.path.join(os.path.pardir, os.path.pardir, 'Results')
+fp_figure = os.path.join(fp_results, 'figures')
 
 # Output from bentso.py
-filepath_production = os.path.join(fp, 'ENTSO_production_volumes.csv')
-filepath_intensities = os.path.join(fp, 'final_emission_factors.csv')
-filepath_trades = os.path.join(fp, 'trades.csv')
-filepath_tradeonly_ef = os.path.join(fp, 'AL_HR_LU_TR_ef_hv.csv')
+filepath_production = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
+filepath_intensities = os.path.join(fp_output, 'final_emission_factors.csv')
+filepath_trades = os.path.join(fp_output, 'trades.csv')
+filepath_tradeonly_ef = os.path.join(fp_output, 'AL_HR_LU_TR_ef_hv.csv')
 
 
 #%%
@@ -122,7 +125,7 @@ C.sort_index(axis=0, inplace=True)
 # First, read transmission and distribution losses, downloaded from World Bank economic indicators (most recent values from 2014)
 losses_fp = os.path.join(fp_data, 'API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv')
 try:
-    TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1,58], index_col=0)
+    TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1, 58], index_col=0)
     TD_losses = TD_losses.iloc[:,-7:].dropna(how='all', axis=1)
     TD_losses = TD_losses.apply(lambda x: x/100+1) # convert losses to a multiplicative factor
 
@@ -259,7 +262,7 @@ lifetime = 180000 # vehicle lifetime in km
 production_el_intensity = 684 # Korean el-mix 684 g CO2/kWh, from ecoinvent
 
 # read in data
-vehicle_fp = os.path.join(fp_data, 'car_specifications - feb 2020.xlsx')
+vehicle_fp = os.path.join(fp_data, 'car_specifications.xlsx')
 cars = pd.read_excel(vehicle_fp, index_col=[0,1,2], usecols='A:G', skipfooter=28)
 
 #%%
@@ -504,16 +507,23 @@ writer.save()
 #%%
 
 # Export for figures
+
+fp = os.path.abspath(os.path.curdir)
+fp_output = os.path.join(os.path.curdir, 'output')
+os.chdir(fp_output)
+
 keeper = 'country-specific indirect'
-results.to_pickle(keeper+'_BEV.pkl')
-CFEL.to_pickle(keeper+'_el.pkl')
-BEV_impactsc.to_pickle(keeper+'_BEV_impacts_consumption.pkl')
-ICEV_total_impacts.to_pickle(keeper+'_ICEV_impacts.pkl')
+results.to_pickle(keeper + '_BEV.pkl')
+CFEL.to_pickle(keeper + '_el.pkl')
+BEV_impactsc.to_pickle(keeper + '_BEV_impacts_consumption.pkl')
+ICEV_total_impacts.to_pickle(keeper + '_ICEV_impacts.pkl')
+
+os.chdir(fp)
 
 #%%
 # Extra calculations
 
-BEV_total_use = BEV_use*lifetime/1e6  #absolute lifetime operation emissions
+BEV_total_use = BEV_use * lifetime / 1e6  #absolute lifetime operation emissions
 
 
 #%%
