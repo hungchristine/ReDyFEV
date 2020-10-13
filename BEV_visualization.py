@@ -52,14 +52,14 @@ fp_data = os.path.join(fp, 'data')
 
 def visualize(experiment, export_figures=True, include_TD_losses=True):
     fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment)
-    plot_all(fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, include_TD_losses, export_figures)
+    plot_all(experiment, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, include_TD_losses, export_figures)
 
 
 def setup(experiment):
     fp_output = os.path.join(fp, 'output')
     fp_results = os.path.join(fp, 'results')
     fp_figure = os.path.join(fp_results, 'figures')
-    fp_experiment = os.path.join(fp_figure, '_' + experiment)
+    fp_experiment = os.path.join(fp_figure, experiment)
 
     if not os.path.exists(fp_results):
         os.mkdir(fp_results)
@@ -89,17 +89,17 @@ def setup(experiment):
     return fp_experiment, CFEL, results, ICEV_total_impacts, mapping_data
 
 
-def plot_all(fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, include_TD_losses=True, export_figures=True):
-    plot_fig1(fp_figure, CFEL, include_TD_losses, export_figures)
-    plot_fig2(fp_figure, mapping_data, export_figures)
-    plot_fig3(fp_figure, mapping_data, ICEV_total_impacts, export_figures)
+def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, include_TD_losses=True, export_figures=False):
+    plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures)
+    plot_fig2(exp, fp_figure, mapping_data, export_figures)
+    plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures)
 
     try:
-        plot_fig4(fp_figure, results, export_figures, orientation='both')
+        plot_fig4(exp, fp_figure, results, export_figures, orientation='both')
     except Exception as e:
         print(e)
 
-    plot_fig5(fp_figure, results, export_figures)
+    plot_fig5(exp, fp_figure, results, export_figures)
 
 # %% Helper class for asymmetric normalizing colormaps
 
@@ -122,7 +122,7 @@ class MidpointNormalize(colors.Normalize):
 
 # %% Plot Figure 1
 
-def plot_fig1(fp_figure, CFEL, include_TD_losses, export_figures):
+def plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures):
     # Prepare variables for Figure 1
     CFEL_sorted = CFEL.sort_values(by='Production mix intensity')
 
@@ -135,24 +135,32 @@ def plot_fig1(fp_figure, CFEL, include_TD_losses, export_figures):
     print("number of importers: " + str(sum(net_trade > 0)))
     print("number of exporters: " + str(sum(net_trade < 0)))
 
+
     # Finally, plot Figure 1
     mark_color = 'RdBu_r'
     sns.set_style('whitegrid')
 
     # Prep country marker sizes; for now, use same size for all axis types
-    marker_size = (CFEL_sorted.iloc[:, 1] / (CFEL_sorted.iloc[:, 1].sum()) * 1200)**2  # marker size = diameter **2
-    if include_TD_losses:
-        plot_lim = 1100
+    size_ind = 'production'
+    if size_ind == 'consumption':
+        marker_size = (CFEL_sorted.iloc[:, 1] / (CFEL_sorted.iloc[:, 1].sum()) * 1200)**2  # marker size = diameter **2
+    elif size_ind == 'production':
+        marker_size = (CFEL_sorted.iloc[:, 0] / (CFEL_sorted.iloc[:, 0].sum()) * 1200)**2  # marker size = diameter **2
     else:
-        plot_lim = 1200
+        print('invalid value for size_ind')
 
-    fig1_generator(fp_figure, CFEL_sorted, plot_lim, export_figures,
-                       'linear', 'consumption', marker_size, mark_color, net_trade_TL, xlim=500, ylim=500)
+    if include_TD_losses:
+        plot_lim = 1300
+    else:
+        plot_lim = 1300
+
+    fig1_generator(exp, fp_figure, CFEL_sorted, plot_lim, export_figures,
+                   'linear', size_ind, marker_size, mark_color, net_trade_TL, xlim=500, ylim=500)
 
 # %% Figure 1 generator (carbon footprint of electricity production mix vs consumption mix)
 
 
-def fig1_generator(fp_figure, CFEL_sorted, plot_maxlim, export_figures, axis_type, size_ind, marker_size, marker_clr, net_trade=None, xlim=None, ylim=None):
+def fig1_generator(exp, fp_figure, CFEL_sorted, plot_maxlim, export_figures, axis_type, size_ind, marker_size, marker_clr, net_trade=None, xlim=None, ylim=None):
     """ Generates figure for Figure 1; carbon footprint of production vs consumption
     mixes. Can be plotted on linear, log or semilog axes
     """
@@ -165,7 +173,7 @@ def fig1_generator(fp_figure, CFEL_sorted, plot_maxlim, export_figures, axis_typ
         axis_type = "log"
     ax.set_xscale(axis_type)
 
-    # Finally, plot data
+    ### Finally, plot data
     norm = MidpointNormalize(midpoint=0, vmax=net_trade.max(), vmin=net_trade.min())
     plot = ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
                       s=marker_size, alpha=0.5, norm=norm, c=net_trade, cmap=marker_clr, label='_nolegend_')
@@ -176,18 +184,17 @@ def fig1_generator(fp_figure, CFEL_sorted, plot_maxlim, export_figures, axis_typ
     ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
                s=marker_size, alpha=0.7, norm=norm, c="None", edgecolor='k', linewidths=0.7,
                label='_nolegend_')
-    plt.axis("tight")
 
-    # Configure axis ticks and set minimum limits to 0 (was -60)
-    plt.tick_params(which='minor', direction='out', length=4.0)
-    plt.tick_params(which='major', direction='out', length=6.0, labelsize=16.5)
+    ### Configure axis ticks and set minimum limits to 0 (was -60)
+    ax.tick_params(which='minor', direction='out', length=4.0)
+    ax.tick_params(which='major', direction='out', length=6.0, labelsize=16.5)
     ax.xaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
 
     ax.set_xlim(left=0, right=plot_maxlim)
     ax.set_ylim(bottom=0, top=plot_maxlim)
 
-    # Size legend
+    ### Size legend
     legend_sizes = [(x / 100 * 1200)**2 for x in [15, 10, 5, 1]]
     legend_labels = ["15%", "10%", "5%", "1%"]
 
@@ -342,13 +349,16 @@ def fig1_generator(fp_figure, CFEL_sorted, plot_maxlim, export_figures, axis_typ
     plt.show()
 
     if export_figures:
-        keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig_1-' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig_1 -' + keeper + '.png'), bbox_inches='tight')
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig_1 - ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_1 - ' + keeper + '.png'), bbox_inches='tight')
+
+    plt.show()
+
 
 # %% Figure 5 ((histogram with fleet size vs ICEV:BEV ratio))
 
-def plot_fig5(fp_figure, results, export_figures):
+def plot_fig5(exp, fp_figure, results, export_figures):
     # ## Trial: Make figure comparing car fleet and energy consumption
     # Load car fleet data from Eurostat
     fleet_fp = os.path.join(fp_data, 'road_eqs_carage.xls')
@@ -356,8 +366,6 @@ def plot_fig5(fp_figure, results, export_figures):
 
     car_fleet.replace(':', value=np.nan, inplace=True)
     car_fleet.index = coco.CountryConverter().convert(names=car_fleet.index.tolist(), to="ISO3")
-
-    # %%
 
     # Prepare the data
     y_axis = 1 / results['RATIO BEV:ICEV - Segment C - Consumption mix']
@@ -429,15 +437,15 @@ def plot_fig5(fp_figure, results, export_figures):
         if patch_area >= threshold:
             patch.set_facecolor('xkcd:cadet blue')
 
-    plt.show()
     if export_figures:
-        keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
         plt.savefig(os.path.join(fp_figure, 'Fig_5 - ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
         plt.savefig(os.path.join(fp_figure, 'Fig_5 - ' + keeper + '.png'), bbox_inches='tight')
 
+    plt.show()
 
 # %% Figure 4 (differences for domestic production)
-def plot_fig4(fp_figure, results, export_figures, orientation='both'):
+def plot_fig4(exp, fp_figure, results, export_figures, orientation='both'):
     A_diff = (results['BEV footprint, EUR production - Segment A - Consumption mix'] -
               results['BEV footprint - Segment A - Consumption mix']) / results['BEV footprint - Segment A - Consumption mix']
     F_diff = (results['BEV footprint, EUR production - Segment F - Consumption mix'] -
@@ -463,12 +471,13 @@ def plot_fig4(fp_figure, results, export_figures, orientation='both'):
         ax.grid(b=True, which='major', axis='x', linewidth=2.5)
         ax.legend(['A segment (26.6 kWh battery)', 'F segment (89.8 kWh battery)'], loc=3, facecolor='white', edgecolor='k', fontsize=18, frameon=True, borderpad=1)
 
-        plt.show()
 
         if export_figures:
-            keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-            plt.savefig(os.path.join(fp_figure, 'Fig_4_horizontal' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-            plt.savefig(os.path.join(fp_figure, 'Fig_4_horizontal' + keeper + '.png'), bbox_inches='tight')
+            keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+            plt.savefig(os.path.join(fp_figure, 'Fig_4_horizontal ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig_4_horizontal ' + keeper + '.png'), bbox_inches='tight')
+
+        plt.show()
 
     if orientation == 'vertical' or 'both':
         # Vertical variation of Figure 4
@@ -479,15 +488,15 @@ def plot_fig4(fp_figure, results, export_figures, orientation='both'):
         ax.legend(facecolor='white', edgecolor='k', fontsize='large', frameon=True)
         ax.set_ylabel('Difference in BEV carbon intensity by shifting to domestic battery production', labelpad=12)
 
-        plt.show()
 
         if export_figures:
-            keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-            plt.savefig(os.path.join(fp_figure, 'Fig_4' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-            plt.savefig(os.path.join(fp_figure, 'Fig_4' + keeper), bbox_inches='tight')
+            keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+            plt.savefig(os.path.join(fp_figure, 'Fig_4 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig_4 ' + keeper), bbox_inches='tight')
     else:
         raise Exception('Invalid orientation for Figure 4')
 
+    plt.show()
 
 # %% map_prep
 
@@ -612,7 +621,7 @@ def annotate_map(ax, countries, mapping_data, values, cmap_range, threshold=0.8,
 # %% Figure 2
 
 
-def plot_fig2(fp_figure, mapping_data, export_figures):
+def plot_fig2(exp, fp_figure, mapping_data, export_figures):
     # # Make Figure 2 as single figure with subplots
     sns.set_style('dark')
     vmin = 50
@@ -699,16 +708,16 @@ def plot_fig2(fp_figure, mapping_data, export_figures):
 
     cbar.ax.tick_params(labelsize=9, pad=4)
 
-    plt.show()
 
     if export_figures:
-        keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig_2' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig_2' + keeper), bbox_inches='tight')
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper), bbox_inches='tight')
 
+    plt.show()
 
 # %% Figure 3
-def plot_fig3(fp_figure, mapping_data, ICEV_total_impacts, export_figures):
+def plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures):
     # # Make multiple versions of Figure 3
     #
     # First, with A-segment ratios and the difference of A- and F-segments (delta)
@@ -728,12 +737,12 @@ def plot_fig3(fp_figure, mapping_data, ICEV_total_impacts, export_figures):
     rmax = max(mapping_data['abs_diff_A'].max(),
                mapping_data['abs_diff_C'].max(),
                mapping_data['abs_diff_D'].max(),
-               mapping_data['abs_diff_F'].max())-2
+               mapping_data['abs_diff_F'].max()) - 2
 
     rmin = min((mapping_data['abs_diff_A'].min(),
                 mapping_data['abs_diff_C'].min(),
                 mapping_data['abs_diff_D'].min(),
-                mapping_data['abs_diff_F'].min()))+2
+                mapping_data['abs_diff_F'].min())) + 2
 
     N = 7  # Number of sections from full colormap; must be odd number
     cmap_diff = plt.get_cmap('RdYlGn', N)
@@ -816,17 +825,16 @@ def plot_fig3(fp_figure, mapping_data, ICEV_total_impacts, export_figures):
     cbar.ax.yaxis.set_minor_locator(FixedLocator(minorticks))
     cbar.ax.tick_params(labelsize=9, pad=4)
 
-    plt.show()
-
     if export_figures:
-        keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff' + keeper), bbox_inches='tight')
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff ' + keeper), bbox_inches='tight')
 
+    plt.show()
 
 #%% Optional figures for plotting
 
-def plot_el_trade(total_imported, total_exported, net_trade, export_figures):
+def plot_el_trade(exp, total_imported, total_exported, net_trade, export_figures):
     """ plot import, exports and net trade for each country """
 
     plot_trades = pd.DataFrame([total_imported, -total_exported, total_imported - total_exported, net_trade])
@@ -843,13 +851,12 @@ def plot_el_trade(total_imported, total_exported, net_trade, export_figures):
     plt.ylabel('Electricity traded, TWh', fontsize=14)
     plt.legend(fontsize=14, frameon=True, facecolor='w', borderpad=1)
 
-    plt.show()
-
     if export_figures:
-        keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure,'Fig_eltrade' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure,'Fig_eltrade' + keeper + '.png'), bbox_inches='tight')
 
-        plt.savefig(os.path.join(fp_figure,'Fig_eltrade'+keeper+'.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure,'Fig_eltrade'+keeper+'.png'), bbox_inches='tight')
+    plt.show()
 
 
 def trade_heatmap(trades):
