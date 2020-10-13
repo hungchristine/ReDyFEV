@@ -90,16 +90,16 @@ def setup(experiment):
 
 
 def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, include_TD_losses=True, export_figures=False):
-    plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures)
+#    plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures)
     plot_fig2(exp, fp_figure, mapping_data, export_figures)
-    plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures)
+#    plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures)
 
-    try:
-        plot_fig4(exp, fp_figure, results, export_figures, orientation='both')
-    except Exception as e:
-        print(e)
-
-    plot_fig5(exp, fp_figure, results, export_figures)
+#    try:
+#        plot_fig4(exp, fp_figure, results, export_figures, orientation='both')
+#    except Exception as e:
+#        print(e)
+#
+#    plot_fig5(exp, fp_figure, results, export_figures)
 
 # %% Helper class for asymmetric normalizing colormaps
 
@@ -202,14 +202,16 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, plot_maxlim, export_figures, axi
     ada = AnchoredDrawingArea(300, 300, 0, 0, loc=2, frameon=True)
     if size_ind == 'consumption':
         legend_title = AnchoredText('% of total European consumption',
-                                    frameon=False, loc=9, bbox_to_anchor=(0.178, 0.990),
-                                    bbox_transform=ax.transAxes, prop=dict(size=17, weight='medium'))
+                                    frameon=False, loc=9, bbox_to_anchor=(0.18, 0.990),
+                                    bbox_transform=ax.transAxes,
+                                    prop=dict(size=17, weight='medium'))
     elif size_ind == 'production':
         legend_title = AnchoredText('% of total European production',
                                     frameon=False, loc=9, bbox_to_anchor=(0.174, 0.990),
-                                    bbox_transform=ax.transAxes, prop=dict(size=17, weight='medium'))
+                                    bbox_transform=ax.transAxes,
+                                    prop=dict(size=17, weight='medium'))
 
-    add_year = AnchoredText('2019', frameon=False, loc=9, bbox_to_anchor=(0.18, 0.961),
+    add_year = AnchoredText('2019', frameon=False, loc=9, bbox_to_anchor=(0.185, 0.961),
                             bbox_transform=ax.transAxes, prop=dict(size=17, weight='medium'))
 
     # The below is for having the legend in the bottom right position
@@ -238,47 +240,29 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, plot_maxlim, export_figures, axi
 
     ax.add_artist(ada)
 
-    # 10%, 20%, 50% shading and x=y line
+    ### 10%, 20%, 50% shading and x=y line
+    # x=y
     ax.plot([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1]], color="grey", alpha=0.6)
+    # 10%
     plt.fill_between([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1] * 1.1],
-                     [0, ax.get_xlim()[1] * 0.9], color="grey", alpha=0.13)
+                     [0, ax.get_xlim()[1] * 0.9], color="grey", alpha=0.13, zorder=0)
+    # 20%
     plt.fill_between([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1] * 1.2],
-                     [0, ax.get_xlim()[1] * 0.8], color="grey", alpha=0.1)
+                     [0, ax.get_xlim()[1] * 0.8], color="grey", alpha=0.1, zorder=0)
     plt.fill_between([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1] * 1.5],
-                     [0, ax.get_xlim()[1] * 0.5], color='grey', alpha=0.07)
+                     [0, ax.get_xlim()[1] * 0.5], color='grey', alpha=0.07, zorder=0)
     ax.annotate(r'$\pm$ 10%', xy=(0, 0), xytext=(0.881, 0.952), xycoords='axes fraction', fontsize=13, rotation=43)
     ax.annotate(r'$\pm$ 20%', xy=(0, 0), xytext=(0.808, 0.952), xycoords='axes fraction', fontsize=13, rotation=43)
     ax.annotate(r'$\pm$ 50%', xy=(0, 0), xytext=(0.64, 0.952), xycoords='axes fraction', fontsize=13, rotation=43)
     ax.annotate(r'x = y', xy=(0, 0), xytext=(0.954, 0.962), xycoords='axes fraction', fontsize=13, rotation=45)
 
-    plt.xlabel("Carbon footprint of production mix \n (g CO$_2$ kWh$^{-1}$)", fontsize=20, labelpad=14)
-    plt.ylabel("Carbon footprint of consumption mix \n (g CO$_2$ kWh$^{-1}$)", fontsize=20, labelpad=14)
+    ax.set_xlabel("Carbon footprint of production mix \n (g CO$_2$ kWh$^{-1}$)", fontsize=20, labelpad=14)
+    ax.set_ylabel("Carbon footprint of consumption mix \n (g CO$_2$ kWh$^{-1}$)", fontsize=20, labelpad=14)
 
-    # Make colorbar
-    ax_cbar = fig.add_axes([0.914, 0.2, 0.02, 0.78])  # place colorbar on own Ax
-    ax_cbar.margins(tight=True)
+    # ax.set(xlim=(-144.4086685495113, 1370.626538171297), ylim=(-168.37073024992392, 1238.283791020003))
 
-    # Calculate minimum and maximum labels for colorbar (rounded to nearest 5 within the scale)
-    cbar_min = 5 * round(net_trade.min() / 5)
-    cbar_max = 5 * round((net_trade.max() // 1) / 5)
-    if cbar_max > net_trade.max():  # if maximum is off the legend, round down
-        cbar_max = cbar_max - 5
 
-    # Begin plotting colorbar
-    cbar = plt.colorbar(plot, cax=ax_cbar, ticks=[cbar_min, 0, cbar_max], drawedges=False)
-    # cbar = plt.colorbar(main_plot.get_cmap(), norm=norm, cax=ax_cbar, drawedges=False)
-    cbar.set_label('Net electricity traded, TWh yr$^{-1}$', fontsize=18, rotation=90, labelpad=8)
-    cbar.set_alpha(1)
-    cbar.ax.tick_params(labelsize=14)
-    cbar.outline.set_linewidth(5)
-    cbar.outline.set_color('k')
-    cbar.draw_all()
-
-    # Manually tack on semi-transparent rectangle on colorbar to match alpha of plot; workaround for weird rendering of colorbar with alpha
-    r1 = Rectangle((0, 0), 30, 500, fc='w', ec='k', alpha=0.3)
-    ax_cbar.add_patch(r1)
-
-    # Make and format inset figure
+    ### Make and format inset figure
     ax2 = fig.add_subplot(339)  # for inlay in bottom right position inset subplot
     ax2.axis([400, xlim, 400, ylim])
 
@@ -289,13 +273,14 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, plot_maxlim, export_figures, axi
     marker_size_ratio = (ax.get_xlim()[1] / (ax2.get_xlim()[1] - ax2.get_xlim()[0]))
 
     ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                s=marker_size * marker_size_ratio * (np.pi / 4), alpha=0.5,
+                s= (np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.5,
                 norm=norm, c=net_trade, cmap=marker_clr, edgecolor='k', label='_nolegend_')
     ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                s=marker_size * marker_size_ratio * (np.pi / 4), alpha=0.9,
+                s=(np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.9,
                 norm=norm, c="None", edgecolor='k', linewidths=0.7, label='_nolegend_')  # Hack for darker edge colours
     ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
                 s=2, c='k', alpha=0.9, edgecolor='k', label='_nolegend_')  # Include midpoint in figure
+
     ax2.xaxis.tick_top()
     ax2.yaxis.tick_right()
     ax2.xaxis.set_major_locator(ticker.MultipleLocator(50))
@@ -308,11 +293,10 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, plot_maxlim, export_figures, axi
                      [0, ax2.get_xlim()[1] * 0.8], color="grey", alpha=0.1)
     plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.5],
                      [0, ax2.get_xlim()[1] * 0.5], color='grey', alpha=0.07)
-
     ### Add country text labels
     for (country, country_data) in CFEL_sorted.iterrows():
         # Inset figure labelling
-        if country_data["Production mix intensity"] >= (ax2.get_xlim()[0]*0.9) and country_data["Production mix intensity"] <= (ax2.get_xlim()[1]*1.1) and country_data["Consumption mix intensity"] >= (ax2.get_ylim()[0]*0.9) and country_data["Consumption mix intensity"] <= (ax2.get_ylim()[1]*1.1): #Inset labels
+        if country_data["Production mix intensity"] >= (ax2.get_xlim()[0 ] * 0.9) and country_data["Production mix intensity"] <= (ax2.get_xlim()[1]*1.1) and country_data["Consumption mix intensity"] >= (ax2.get_ylim()[0]*0.9) and country_data["Consumption mix intensity"] <= (ax2.get_ylim()[1]*1.1): #Inset labels
             if country in ['DE', 'IT', 'NL']:
                 pass  # ignore the largest circles in the inset, as they don't need labelling
             else:
@@ -345,8 +329,38 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, plot_maxlim, export_figures, axi
                         xytext=(-9.5, -12 - np.sqrt(marker_size[country]) / 2), textcoords=("offset points"),
                         path_effects=[pe.withStroke(linewidth=4, foreground="w", alpha=0.8)], size=15)
 
-    plt.tight_layout()
-    plt.show()
+    ### Make colorbar
+    # ax_cbar = fig.add_axes([0.9, 0.125, 0.02, 0.755])  # place colorbar on own Ax
+    ax_cbar = fig.add_axes([0.925, 0.125, 0.03, 0.755])  # place colorbar on own Ax
+    # plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+
+    # ax_cbar.margins(tight=True)
+
+    ### Calculate minimum and maximum labels for colorbar (rounded to nearest 5 within the scale)
+    cbar_min = 5 * round(net_trade.min() / 5)
+    cbar_max = 5 * round((net_trade.max() // 1) / 5)
+    if cbar_max > net_trade.max():  # if maximum is off the legend, round down
+        cbar_max = cbar_max - 5
+    # plt.show() # we are ok to here!
+
+    # Begin plotting colorbar
+    ## TRY: specifying additional axes keywords to plt.colorbar
+    ## TRY: something is "sticking out", e.g., rectangle or other artist
+    cbar = plt.colorbar(plot, cax=ax_cbar, ticks=[cbar_min, 0, cbar_max], drawedges=False)#, use_gridspec=True)
+    # cbar = plt.colorbar(plot, cax=ax_cbar, ticks=[cbar_min, 0, cbar_max], drawedges=False)
+    # cbar = plt.colorbar(main_plot.get_cmap(), norm=norm, cax=ax_cbar, drawedges=False)
+    cbar.set_label('Net electricity traded, TWh yr$^{-1}$', fontsize=18, rotation=90, labelpad=8)
+    cbar.set_alpha(1)
+    cbar.ax.tick_params(labelsize=14)
+    cbar.outline.set_linewidth(5)
+    cbar.outline.set_color('k')
+    cbar.draw_all()
+
+    # Manually tack on semi-transparent rectangle on colorbar to match alpha of plot; workaround for weird rendering of colorbar with alpha
+    r1 = Rectangle((0, 0), 30, 500, fc='w', ec='k', alpha=0.3)
+    ax_cbar.add_patch(r1)
+
+    # plt.axis('tight')
 
     if export_figures:
         keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
@@ -629,7 +643,23 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures):
     threshold = 0.40 # threshold for switching annotation colours
 
     # cmap = plt.get_cmap('cmr.savanna_r', 7)
-    cmap = plt.get_cmap('viridis_r',6)
+#    cmap = plt.get_cmap('viridis_r', 6)
+
+#    cmap = colors.ListedColormap(['#4e7496',
+#                                  '#478A7E',
+#                                  '#407E4A',
+#                                  '#547239',
+#                                  '#666032',
+#                                  '#4E2536',
+#                                  '#5A362B'
+#                                  ])
+    cmap = colors.ListedColormap(['#4e7496',
+                                  '#438F77',
+                                  '#3F8638',
+                                  '#737D2F',
+                                  '#734126',
+                                  '#681E3E'
+                                 ])
 
     cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]  # retrieve colormap colors
     cmap = cmap_col
@@ -656,16 +686,16 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures):
 
     # Plot maps
     mapping_data[mapping_data['BEV footprint - Segment A - Production mix'].isna()].plot(ax=ax[0, 0], color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
-    mapping_data[mapping_data['BEV footprint - Segment A - Production mix'].notna()].plot(ax=ax[0, 0], column='BEV footprint - Segment A - Production mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3)
+    mapping_data[mapping_data['BEV footprint - Segment A - Production mix'].notna()].plot(ax=ax[0, 0], column='BEV footprint - Segment A - Production mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3, alpha=0.8)
 
     mapping_data[mapping_data['BEV footprint - Segment A - Consumption mix'].isna()].plot(ax=ax[1, 0], color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
-    mapping_data[mapping_data['BEV footprint - Segment A - Consumption mix'].notna()].plot(ax=ax[1, 0], column='BEV footprint - Segment A - Consumption mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3)
+    mapping_data[mapping_data['BEV footprint - Segment A - Consumption mix'].notna()].plot(ax=ax[1, 0], column='BEV footprint - Segment A - Consumption mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3, alpha=0.8)
 
     mapping_data[mapping_data['BEV footprint - Segment F - Production mix'].isna()].plot(ax=ax[0, 1], color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
-    mapping_data[mapping_data['BEV footprint - Segment F - Production mix'].notna()].plot(ax=ax[0, 1], column='BEV footprint - Segment F - Production mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3)
+    mapping_data[mapping_data['BEV footprint - Segment F - Production mix'].notna()].plot(ax=ax[0, 1], column='BEV footprint - Segment F - Production mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3, alpha=0.8)
 
     mapping_data[mapping_data['BEV footprint - Segment F - Consumption mix'].isna()].plot(ax=ax[1, 1], color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
-    mapping_data[mapping_data['BEV footprint - Segment F - Consumption mix'].notna()].plot(ax=ax[1, 1], column='BEV footprint - Segment F - Consumption mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3)
+    mapping_data[mapping_data['BEV footprint - Segment F - Consumption mix'].notna()].plot(ax=ax[1, 1], column='BEV footprint - Segment F - Consumption mix', cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3, alpha=0.8)
 
     # Annotate with values
     annotate_map(ax[0, 0], mapping_data[mapping_data['BEV footprint - Segment A - Production mix'].notna()].index.to_list(), mapping_data,
@@ -699,8 +729,10 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures):
     fig.subplots_adjust(right=0.8)
     cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
     cbar = fig.colorbar(cb, cax=cbar_ax, extend='both')
+    cbar.set_alpha(0.7)
     cbar.set_label('Lifecycle BEV carbon intensity, \n g CO$_2$ eq/km', rotation=90, labelpad=9, fontsize=12)
     cbar.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+
     # hack to remove minor ticks on colorbar extending past min/max values (bug in matplotlib?)
     minorticks = cbar.ax.get_yticks(minor=True)
     minorticks = [i for i in minorticks if (i >= 0 and i <= 1)]
