@@ -56,7 +56,7 @@ def load_prep_el_data(fp):
     filepath_trades = os.path.join(fp_output, 'trades.csv')
     filepath_tradeonly_ef = os.path.join(fp_output, 'AL_HR_LU_TR_ef_hv.csv')
 
-    # read in production mixes
+    # read in production mixes (annual average)
     production = pd.read_csv(filepath_production, index_col=0)
     production.rename_axis(index='', inplace=True)
 
@@ -118,6 +118,17 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
     # Start electricity calculations (ELFP.m)
     # Calculate production and consumption mixes
 
+    # Carbon intensity of production mix
+    CFPI_no_TD = pd.DataFrame(production.multiply(C.T).sum(axis=1) / production.sum(axis=1), columns=['Production mix intensity'])  # production mix intensity without losses
+    CFPI_no_TD.fillna(0, inplace=True)
+
+     # List of countries that have trade relationships, but no production data
+    trade_only = list(set(trades.index) - set(production.loc[production.sum(axis=1) > 0].index))
+
+    # Add ecoinvent proxy emission factors for trade-only countries
+    for country in trade_only:
+        CFPI_no_TD.loc[country] = trade_ef.loc[country].values
+
     i = country_total_cons_disagg.size  # Number of European regions
 
     g = g_raw
@@ -160,40 +171,30 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
         totgen = Xgen.sum(axis=0)
         r_gendem = totgen / y  # All countries should be 1
 
-    #%% Use non-Leontief assumption (?)
+
+        #%% Generation techonlogy matrix
+
+        # TC is a country-by-generation technology matrix - normalized to share of total domestic generation, i.e., normalized generation/production mix
+        # technology generation, kWh/ kWh domestic generated electricity
+        TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), production), index=g.index, columns=production.columns)
+        TCsum = TC.sum(axis=1)  # Quality assurance - each country should sum to 1
+
+        # Calculate technology generation mix in GWh based on production in each region
+        TGP = pd.DataFrame(np.matmul(TC.transpose(), np.diag(g)), index=TC.columns, columns=g.index)  #.== production
+
+        # Carbon intensity of consumption mix
+        CFCI_no_TD = pd.DataFrame(np.matmul(CFPI_no_TD.T, Lgen), columns=CFPI_no_TD.index).T
+
+    #%% Use non-Leontief assumption for trade
     else:
-        Lgen = TGP
+        prod_emiss = production.multiply(C.T).sum(axis=1)
+        trade_emiss = (pd.DataFrame(np.diag(CFPI_no_TD.iloc(axis=1)[0]), index=CFPI_no_TD.index, columns=CFPI_no_TD.index)).dot(trades)
+        CFCI_no_TD = pd.DataFrame((prod_emiss + trade_emiss.sum(axis=0) - trade_emiss.sum(axis=1)) / y)
 
-    #%% Generation techonlogy matrix
-
-    # TC is a country-by-generation technology matrix - normalized to share of total domestic generation, i.e., normalized generation/production mix
-    # technology generation, kWh/ kWh domestic generated electricity
-    TC = pd.DataFrame(np.matmul(np.linalg.pinv(np.diag(g)), production), index=g.index, columns=production.columns)
-    TCsum = TC.sum(axis=1)  # Quality assurance - each country should sum to 1
-
-    # Calculate technology generation mix in GWh based on production in each region
-    TGP = pd.DataFrame(np.matmul(TC.transpose(), np.diag(g)), index=TC.columns, columns=g.index)  #.== production
-
-
-    #%%
-
-    # Carbon intensity of production mix
-    CFPI_no_TD = pd.DataFrame(production.multiply(C.T).sum(axis=1) / production.sum(axis=1), columns=['Production mix intensity'])  # production mix intensity without losses
-    CFPI_no_TD.fillna(0, inplace=True)
-
-     # List of countries that have trade relationships, but no production data
-    trade_only = list(set(trades.index) - set(production.loc[production.sum(axis=1) > 0].index))
-
-    # Add ecoinvent proxy emission factors for trade-only countries
-    for country in trade_only:
-        CFPI_no_TD.loc[country] = trade_ef.loc[country].values
-
-    # Carbon intensity of consumption mix
-    CFCI_no_TD = pd.DataFrame(np.matmul(CFPI_no_TD.T, Lgen), columns=CFPI_no_TD.index).T
     CFCI_no_TD.columns = ['Consumption mix intensity']
 
 
-    #%%
+    #%% Calculate losses
 
     # Transpose added after removing country aggregation as data pre-treatment
     if include_TD_losses:
@@ -203,7 +204,7 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
         try:
             TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1, 58], index_col=0)
             TD_losses = TD_losses.iloc[:, -7:].dropna(how='all', axis=1)
-            TD_losses = TD_losses.apply(lambda x: x / 100 + 1) # convert losses to a multiplicative factor
+            TD_losses = TD_losses.apply(lambda x: x / 100 + 1)  # convert losses to a multiplicative factor
 
             # ## Calculate total national carbon emissions from el  - production and consumption mixes
             TD_losses.index = coco.convert(names=TD_losses.index.tolist(), to='ISO2', not_found=None)
@@ -257,12 +258,13 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
         g.to_excel(writer, "g")
         q.to_excel(writer, "q")
         y.to_excel(writer, 'y')
-        Atmx.to_excel(writer, "Atmx")
-        Agen.to_excel(writer, "Agen")
-        Ltmx.to_excel(writer, "LTmx")
-        Lgen.to_excel(writer, "Lgen")
-        Xtmx.to_excel(writer, "Xtmx")
-        TGP.to_excel(writer, "TGP")
+        if leontief_el:
+            Atmx.to_excel(writer, "Atmx")
+            Agen.to_excel(writer, "Agen")
+            Ltmx.to_excel(writer, "LTmx")
+            Lgen.to_excel(writer, "Lgen")
+            Xtmx.to_excel(writer, "Xtmx")
+            TGP.to_excel(writer, "TGP")
         CFPI.T.to_excel(writer, "CFPI")
         CFCI.T.to_excel(writer, "CFCI")
         rCP.to_excel(writer, "rCP")
@@ -285,8 +287,6 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     fp_data = os.path.join(fp, 'data')
     vehicle_fp = os.path.join(fp_data, 'car_specifications.xlsx')
     cars = pd.read_excel(vehicle_fp, index_col=[0, 1, 2], usecols='A:G')
-
-    #%%
 
     vehicle_CO2 = ["BEV", "ICEV"]
 
@@ -314,8 +314,6 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     BEV_prod_EU.columns = pd.MultiIndex.from_product([["EUR production impacts BEV"], BEV_prod_EU.columns, ["Consumption mix"]], names=["", "Segment", "Elmix"])
 
 
-    #%%
-
     # Remove trade-only countries
     remove_country_list = []
 
@@ -325,8 +323,6 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
                 elmixes.drop(columns=country, inplace=True)
             except:
                 print(f'{country} not in elmixes!')
-
-    #%%
 
     # Calculate use phase emissions
     segs = cars.loc['BEV', 'Use phase', 'Wh/km']
@@ -340,20 +336,23 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
 
     BEV_use = (segs.multiply(elmixes_for_calc / 1000)).T
 
-    #%%
-
     # Add production and EOL BEV
-
     BEV_other = BEV_prod_impacts + cars.loc["BEV", "EOL", "t CO2"].values
     BEV_other_intensity = BEV_other / BEV_lifetime * 1e6  # in g CO2-eq
     BEV_other_intensity.index = ["g CO2/km"]
 
 
-    #%%
-
     # BEV impacts with production and consumption mixes
-    BEV_impactsp = (BEV_use['Production mix intensity'].T * BEV_lifetime / 1e6).add(BEV_other.loc['t CO2'], axis=0)
-    BEV_impactsc = (BEV_use['Consumption mix intensity'].T * BEV_lifetime / 1e6).add(BEV_other.loc['t CO2'], axis=0)
+    # Check which technology lifetime to use as baseline for use phase
+    # (use shortest lifetime between the two for comparison to avoid vehicle replacement)
+    if BEV_lifetime <= ICEV_lifetime:
+        lifetime = BEV_lifetime
+    elif BEV_lifetime > ICEV_lifetime:
+        # in the case for BEV lifetimes longer than ICEV lifetimes
+        lifetime = ICEV_lifetime
+
+    BEV_impactsp = (BEV_use['Production mix intensity'].T * lifetime / 1e6).add(BEV_other.loc['t CO2'], axis=0)
+    BEV_impactsc = (BEV_use['Consumption mix intensity'].T * lifetime / 1e6).add(BEV_other.loc['t CO2'], axis=0)
 
     BEV_impacts = pd.concat([BEV_impactsp.T, BEV_impactsc.T], axis=1, keys=['Production mix', 'Consumption mix'])
     BEV_impacts = BEV_impacts.swaplevel(axis=1, i=0, j=1)
@@ -361,19 +360,18 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
 
     BEV_prod_sharesp = BEV_prod_impacts.values / (BEV_impactsp.T)
     BEV_prod_sharesc = BEV_prod_impacts.values / (BEV_impactsc.T)
-    BEV_use_sharesp = (BEV_use['Production mix intensity'] * BEV_lifetime / 1e6)/(BEV_impactsp.T)
-    BEV_use_sharesc = (BEV_use['Consumption mix intensity'] * BEV_lifetime / 1e6)/(BEV_impactsc.T)
+    BEV_use_sharesp = (BEV_use['Production mix intensity'] * lifetime / 1e6) / (BEV_impactsp.T)
+    BEV_use_sharesc = (BEV_use['Consumption mix intensity'] * lifetime / 1e6) / (BEV_impactsc.T)
 
-    #%%
 
+    # Calculate full lifecycle intensity using production and consumption mixes
     BEVp = pd.DataFrame(BEV_use["Production mix intensity"] + BEV_other_intensity.loc["g CO2/km"])
     BEVc = pd.DataFrame(BEV_use["Consumption mix intensity"] + BEV_other_intensity.loc["g CO2/km"])
 
     #%%
 
-    # Calculate BEV footprints with EUR production
-
-    BEV_fp_EU = (BEV_prod_EU.add(cars.loc["BEV", "EOL", "t CO2"], level=1, axis=1) / BEV_lifetime*1e6)
+    # Calculate BEV footprints with EUR (domestic) battery production
+    BEV_fp_EU = (BEV_prod_EU.add(cars.loc["BEV", "EOL", "t CO2"], level=1, axis=1) / BEV_lifetime * 1e6)
 
     # Currently, EU production assumes consumption mix, so only examine using consumption mix for both manufacturing and use phase for consistency
     EU_BEVc = BEV_fp_EU.add(BEV_use['Consumption mix intensity'].reindex(BEV_fp_EU.columns, axis=1, level=1), axis=1)
@@ -388,10 +386,22 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     #%%
 
     # Calculate total lifecycle emissions for ICEVs
+    ICEV_prodEOL_impacts = cars.loc['ICEV', 'Production', 't CO2'].add(cars.loc['ICEV', 'EOL', 't CO2'], axis=0)
 
-    ICEV_total_impacts = pd.DataFrame(cars.loc["ICEV"].sum(axis=0)).transpose()
-    ICEV_lc_footprint = ICEV_total_impacts.loc[0] * 1e6 / ICEV_lifetime
-    #ICEV_total_impacts
+    # ICEV_total_impacts = pd.DataFrame(cars.loc['ICEV'].sum(axis=0)).transpose()
+    if ICEV_lifetime <= BEV_lifetime:
+        ICEV_total_impacts = ICEV_prodEOL_impacts.add(cars.loc['ICEV', 'Use phase', 'g CO2/km'] * ICEV_lifetime / 1e6, axis=0)
+        ICEV_prod_EOL_fp = ICEV_prodEOL_impacts * 1e6 / ICEV_lifetime
+    elif ICEV_lifetime > BEV_lifetime:
+        # need to compare vehicles based on equal distance driven
+        ICEV_total_impacts = ICEV_prodEOL_impacts.add(cars.loc['ICEV', 'Use phase', 'g CO2/km' ] * BEV_lifetime / 1e6, axis=0)
+        ICEV_prod_EOL_fp = ICEV_prodEOL_impacts * 1e6 / BEV_lifetime
+
+    ICEV_lc_footprint = ICEV_prod_EOL_fp + cars.loc['ICEV', 'Use phase', 'g CO2/km']
+    ICEV_total_impacts = pd.DataFrame(ICEV_total_impacts).T  # force to dataframe
+
+    #     ICEV_lc_footprint = (cars.loc[['ICEV','Production', 't CO2']]  + cars.loc[['ICEV', 'Use phase', 't CO2']] / 180000 * ICEV_lifetime + cars.loc[['ICEV', 'Use phase', 't CO2']]) * 1e6 / ICEV_lifetime
+
     ICEV_lc_shares = cars.loc['ICEV'] / cars.loc['ICEV'].sum(axis=0)
 
 
@@ -399,7 +409,7 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
 
     # Calculate BEV:ICEV ratios
 
-    ratio_use_prod = BEV_use["Production mix intensity"] / cars.loc["ICEV","Use phase","t CO2"]
+    ratio_use_prod = BEV_use["Production mix intensity"] / cars.loc["ICEV", "Use phase", "t CO2"]
 
     #%%
 
