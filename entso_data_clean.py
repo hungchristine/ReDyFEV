@@ -14,7 +14,22 @@ import logging
 def checkEqual(iterator):
     return len(set(iterator)) <= 1
 
+def distribute_neg_hydro(time_per):
+    if time_per['Hydro Pumped Storage'] < 0:
+        neg_val = time_per['Hydro Pumped Storage']
+        time_per['Hydro Pumped Storage'] = 0
+        # "supply" pumping power from proportional to the production mix of the
+        #  time period
+        time_per = time_per + (time_per / time_per.sum()) * neg_val
+    return time_per
+
 def aggregate_entso(dictionary, start=None, end=None):
+    """ Receives dictionary of raw data queried from ENTSO-E Transparency Portal
+        and start and end of sub-annual period desired (optional)
+        Calculates the size in timesteps between samples (rows) and checks
+        if they are identical (i.e., even timesteps throughout time series)
+
+    """
     new_dict = {}
     summed_dict = {}
     for key, value in dictionary.items():
@@ -37,31 +52,33 @@ def aggregate_entso(dictionary, start=None, end=None):
                     except:
                         print('Could not perform!')
 
-        # TODO: deal with negative values in hydropower pumped storage... perhaps not necessary, given the annual aggregation? maybe just add a check...
-#        if production['Hydropower Pumped Storage'] < 0:
-            # remove proportional amounts of all other
-
-
                 # Make sure timesteps are all equal length before calculating
                 # NB: this is made obsolete by using bentso's fullyear=True
                 if checkEqual(timestep_list):
+                    if isinstance(value, pd.DataFrame):  # check if value is the production matrix
+                        logging.info(f'Correcting for negative pumped hydropower in {key}')
+                        value = value.apply(distribute_neg_hydro, axis=1)  # correct for negative pumped hydro
                     summed_dict[key] = (value * timestep_list[0] / 1e6).sum() # To calculate electricity generated; take power per timestep and multiply by length of time period. Sum over whole year
                     new_dict[key] = value
                 else:
                     print(f'warning: unequal time steps for {key}')
+                    logging.warning(f'unequal time steps for %s', key)
                     if min(timestep_list) == 1:
+                        logging.info(f'resampling data to 1 hour increments in {key}')
                         new_dict[key] = value.resample('1H').interpolate()
                         summed_dict[key] = (new_dict[key] * timestep_list[0] / 1e6).sum()
                         print('1 hour')
                     elif min(timestep_list) == 0.25:
+                        logging.info(f'resampling data to 15 minute increments in {key}')
                         new_dict[key] = value.resample('15T').interpolate()
                         summed_dict[key] = (new_dict[key] * timestep_list[0] / 1e6).sum()
                         print('15 minutes')
                     else:
                         print('very uneven timesteps')
                         #value = (value*timestep_list[0]/1000).sum()
-        except:
+        except Exception as e:
            print(f'something went wrong in {key}')
+           print(e)
     return summed_dict, new_dict
 
 
