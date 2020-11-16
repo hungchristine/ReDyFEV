@@ -1,4 +1,7 @@
 *.pkl
+*.pickle
 *.png
+*.pdf
+*.xlsx
 code_check_*
 Fig*
