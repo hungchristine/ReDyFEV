@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import os, sys
 import pickle
+import logging
 
 fp_results = os.path.join(os.path.curdir, 'results')
 fp_output = os.path.join(os.path.curdir, 'output')
@@ -14,7 +15,7 @@ def hybrid_emission_factors():
     import pylcaio
     Analysis = pylcaio.Analysis('ecoinvent3.5','exiobase3', method_double_counting='STAM', capitals=False)
 
-    # For making human-readable indices; consists of all process metadata
+    # For making human-readable indices; consists of all ecoinvent process metadata
     labels = Analysis.PRO_f
 
     # Make DataFrame for whole ecoinvent requirements matrix with human-readable indices
@@ -263,7 +264,9 @@ def hybrid_emission_factors():
 
     # Countries for which we have production data, but no hybridized emission factors
     no_ef_countries = set(entso_e_production.index) - set(ef_countries.index)
+    print('Countries with production data, but no hybridized emission factors:')
     print(no_ef_countries)
+    logging.warning(f'{no_ef_countries} have production data from ENTSO_E but no hybridized emission factors')
 
     list(set(ef_countries.columns) - set(entso_e_production.index))
 
@@ -282,8 +285,7 @@ def hybrid_emission_factors():
     countries_missing_ef = {}
     for tec, col in check_df.iteritems():
         temp = check_df.index[check_df[tec] == False].tolist()
-        print(tec)
-        print(temp)
+        print(f'For {tec}, regionalized, hybridized emission factors are missing for {temp}. Using technological average from available regions instead.')
         temp2 = []
         for country in temp:
             if ef_mask.loc[country, tec]:
@@ -348,10 +350,12 @@ def clean_impact_factors():
         trade_df = pickle.load(handle)
 
     try:
+        print('Calculating hybridized emission factors from pyLCAIO')
         # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
         ef, missing_factors = hybrid_emission_factors(gen_df)
 
     except:
+        print('Calculating from pyLCAIO failed. Importing previously calculated emission factors instead')
         # import ready-calculated emission factors if no access to pylcaio object
         ef = pd.read_csv(os.path.join(fp_output, 'country_emission_factors.csv'), index_col=[0])
         missing_factors = pd.read_csv(os.path.join(fp_output, 'missing_emission_factors.csv'), index_col=[0])
