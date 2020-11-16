@@ -9,12 +9,12 @@ Users can run two types of experiments concurrently; the electricity sampling pe
 import logging
 from datetime import datetime
 
-logname = 'run ' + datetime.now().strftime('%d-%m-%y, %H-%M')
+logname = 'run ' + datetime.now().strftime('%d-%m-%y, %H-%M') + '.log'
 logging.basicConfig(filename=logname,
-                            filemode='a',
                             format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                             datefmt='%H:%M:%S',
-                            level=logging.DEBUG)
+                            level=logging.INFO)
+
 
 if __name__ == "__main__":
     import bentso_extract
