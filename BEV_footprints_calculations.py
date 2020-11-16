@@ -30,6 +30,8 @@ import numpy as np
 import pandas as pd
 import country_converter as coco
 
+import logging
+
 #%% Main function
 def run_stuff(run_id, export_data=True, include_TD_losses=True, BEV_lifetime=180000, ICEV_lifetime=180000, leontief_el=True, production_el_intensity = 684 ):
      # Korean el-mix 684 g CO2/kWh, from ecoinvent
@@ -126,6 +128,7 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
     trade_only = list(set(trades.index) - set(production.loc[production.sum(axis=1) > 0].index))
 
     # Add ecoinvent proxy emission factors for trade-only countries
+    logging.info('Replacing missing production mix intensities with values from ecoinvent:')
     for country in trade_only:
         CFPI_no_TD.loc[country] = trade_ef.loc[country].values
 
