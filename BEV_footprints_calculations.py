@@ -206,19 +206,24 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
     if include_TD_losses:
         # Calculate technology characterization factors including transmission and distribution losses
         # First, read transmission and distribution losses, downloaded from World Bank economic indicators (most recent values from 2014)
-        losses_fp = os.path.join(fp_data, 'API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv')
-        try:
-            TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1, 58], index_col=0)
-            TD_losses = TD_losses.iloc[:, -7:].dropna(how='all', axis=1)
-            TD_losses = TD_losses.apply(lambda x: x / 100 + 1)  # convert losses to a multiplicative factor
+        if isinstance(include_TD_losses, float):
+            TD_losses = include_TD_losses
+        elif isinstance(include_TD_losses, bool):
+            losses_fp = os.path.join(fp_data, 'API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv')
+            try:
+                TD_losses = pd.read_csv(losses_fp, skiprows=[0,1,2,3], usecols=[1, 58], index_col=0)
+                TD_losses = TD_losses.iloc[:, -7:].dropna(how='all', axis=1)
+                TD_losses = TD_losses.apply(lambda x: x / 100 + 1)  # convert losses to a multiplicative factor
 
-            # ## Calculate total national carbon emissions from el  - production and consumption mixes
-            TD_losses.index = coco.convert(names=TD_losses.index.tolist(), to='ISO2', not_found=None)
-            TD_losses = TD_losses.loc[countries]
-            TD_losses = pd.Series(TD_losses.iloc[:, 0])
-        except:
-            display("Warning! Transmission and distribution losses input files not found!")
-            TD_losses = pd.Series(np.zeros(len(production.index)), index=production.index)
+                # ## Calculate total national carbon emissions from el  - production and consumption mixes
+                TD_losses.index = coco.convert(names=TD_losses.index.tolist(), to='ISO2', not_found=None)
+                TD_losses = TD_losses.loc[countries]
+                TD_losses = pd.Series(TD_losses.iloc[:, 0])
+            except:
+                print("Warning! Transmission and distribution losses input files not found!")
+                TD_losses = pd.Series(np.zeros(len(production.index)), index=production.index)
+        else:
+            print('invalid entry for losses')
 
         # Caclulate carbon intensity of production and consumption mixes including losses
         CFPI_TD_losses = CFPI_no_TD.multiply(TD_losses, axis=0).dropna(how='any', axis=0)  # apply transmission and distribution losses to production mix intensity
