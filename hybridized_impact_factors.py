@@ -9,7 +9,7 @@ import logging
 fp_results = os.path.join(os.path.curdir, 'results')
 fp_output = os.path.join(os.path.curdir, 'output')
 
-def hybrid_emission_factors():
+def hybrid_emission_factors(trade_only):
     # append pylcaio folder with hybridized LCI processes
     sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
     import pylcaio
@@ -298,7 +298,7 @@ def hybrid_emission_factors():
 
     # ## Calculate LC emissions for production mix for countries with missing production data
 
-    trade_only = ['AL','BY','HR','LU','MD','MT','RU','TR','UA']
+#    trade_only = ['AL','BY','HR','LU','MD','MT','RU','TR','UA']
     low_volt = labels.loc[labels['activityName'] == 'market for electricity, low voltage']
     trade_only_mixes_lv = low_volt.loc[low_volt['geography'].isin(trade_only)].index
     lv_mix_ef = D_labels.loc[trade_only_mixes_lv]  # low voltage mixes, not used
@@ -344,7 +344,7 @@ def hybrid_emission_factors():
 
     return ef_countries, no_ef
 
-def clean_impact_factors():
+def clean_impact_factors(trade_only):
     with open(os.path.join(fp_output, 'gen_final.pkl'), 'rb') as handle:
             gen_df = pickle.load(handle)
     gen_df.replace(0, np.nan, inplace=True)
@@ -355,8 +355,7 @@ def clean_impact_factors():
     try:
         print('Calculating hybridized emission factors from pyLCAIO')
         # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
-        ef, missing_factors = hybrid_emission_factors(gen_df)
-
+        ef, missing_factors = hybrid_emission_factors(trade_only)
     except:
         print('Calculating from pyLCAIO failed. Importing previously calculated emission factors instead')
         # import ready-calculated emission factors if no access to pylcaio object
