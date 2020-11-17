@@ -1,6 +1,6 @@
 ,Biomass,Fossil Brown coal/Lignite,Fossil Coal-derived gas,Fossil Gas,Fossil Hard coal,Fossil Oil,Fossil Peat,Geothermal,Hydro Pumped Storage,Hydro Run-of-river and poundage,Hydro Water Reservoir,Nuclear,Solar,Waste,Wind Offshore,Wind Onshore
-0,,,,,RO,,,IE,,NO,BG,IE,EE,AT,,SI
-1,,,,,,,,,,,GR,,IE,BE,,SK
+0,,,,,RO,,,HR,,NO,BG,IE,EE,AT,,SI
+1,,,,,,,,IE,,,GR,,IE,BE,,SK
 2,,,,,,,,,,,HU,,,BG,,
 3,,,,,,,,,,,IE,,,CZ,,
 4,,,,,,,,,,,PL,,,DE,,
@@ -9,6 +9,6 @@
 7,,,,,,,,,,,,,,ES,,
 8,,,,,,,,,,,,,,FI,,
 9,,,,,,,,,,,,,,FR,,
-10,,,,,,,,,,,,,,HU,,
-11,,,,,,,,,,,,,,IE,,
-12,,,,,,,,,,,,,,IT,,
+10,,,,,,,,,,,,,,HR,,
+11,,,,,,,,,,,,,,HU,,
+12,,,,,,,,,,,,,,IE,,
