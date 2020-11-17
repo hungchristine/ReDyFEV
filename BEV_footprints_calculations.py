@@ -33,16 +33,19 @@ import country_converter as coco
 import logging
 
 #%% Main function
-def run_stuff(run_id, export_data=True, include_TD_losses=True, BEV_lifetime=180000, ICEV_lifetime=180000, leontief_el=True, production_el_intensity = 684 ):
-     # Korean el-mix 684 g CO2/kWh, from ecoinvent
+def run_stuff(run_id, export_data=True, include_TD_losses=True, BEV_lifetime=180000, ICEV_lifetime=180000, leontief_el=True, production_el_intensity=679, incl_ei=False):
+     # Korean el-mix 679 g CO2/kWh, from ecoinvent
 
     fp = os.path.curdir
 
     production, trades, trade_ef, country_total_prod_disagg, country_total_cons_disagg, g_raw, C = load_prep_el_data(fp)
-    codecheck_file, elmixes, trade_only, country_el, CFEL, CFCI = el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, country_total_cons_disagg, g_raw, trades, trade_ef, include_TD_losses, export_data)  # Leontief electricity calculations
+    codecheck_file, elmixes, trade_only, country_el, CFEL, CFCI = el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, country_total_cons_disagg, g_raw, trades, trade_ef, include_TD_losses, incl_ei, export_data)  # Leontief electricity calculations
     results_toSI, ICEV_total_impacts, ICEV_prodEOL_impacts, ICEV_op_int = BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, production_el_intensity, CFCI)
+
     pickle_results(run_id, results_toSI, CFEL, ICEV_total_impacts, codecheck_file, export_data)
     SI_fp = export_SI(run_id, results_toSI, production, trades, C, CFEL)
+
+    return results_toSI['BEV footprint'].xs('Consumption mix', level=1, axis=1), ICEV_prodEOL_impacts, ICEV_op_int, SI_fp
 
 
 #%% Load and format data for calculations
@@ -101,7 +104,7 @@ def load_prep_el_data(fp):
 
 #%%
 
-def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, country_total_cons_disagg, g_raw, trades, trade_ef, include_TD_losses, export_data):
+def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, country_total_cons_disagg, g_raw, trades, trade_ef, include_TD_losses, incl_ei, export_data):
     fp_data = os.path.join(fp, 'data')
 
     # Make list of full-country resolution
@@ -125,8 +128,9 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
     # Add ecoinvent proxy emission factors for trade-only countries
     logging.info('Replacing missing production mix intensities with values from ecoinvent:')
     for country in trade_only:
-        CFPI_no_TD.loc[country] = trade_ef.loc[country].values
-
+        if CFPI_no_TD.loc[country, 'Production mix intensity'] == 0:
+            logging.info(country)
+            CFPI_no_TD.loc[country] = trade_ef.loc[country].values
     i = country_total_cons_disagg.size  # Number of European regions
 
     g = g_raw
@@ -190,6 +194,10 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
         CFCI_no_TD = pd.DataFrame((prod_emiss + trade_emiss.sum(axis=0) - trade_emiss.sum(axis=1)) / y)
 
     CFCI_no_TD.columns = ['Consumption mix intensity']
+
+    # use ecoinvent for missing countries
+    if incl_ei:
+        CFCI_no_TD.update(trade_ef.rename(columns={'emission factor':'Consumption mix intensity'}))
 
 
     #%% Calculate losses
@@ -310,17 +318,6 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
         BEV_prod_EU[segment] = chck3[segment].values + batt_prod_EU[segment]
 
     BEV_prod_EU.columns = pd.MultiIndex.from_product([["EUR production impacts BEV"], BEV_prod_EU.columns, ["Consumption mix"]], names=["", "Segment", "Elmix"])
-
-
-    # Remove trade-only countries
-    remove_country_list = []
-
-    for country, row in production.sum(axis=1).items():
-        if row == 0:
-            try:
-                elmixes.drop(columns=country, inplace=True)
-            except:
-                print(f'{country} not in elmixes!')
 
     # Calculate use phase emissions
     segs = cars.loc['BEV', 'Use phase', 'Wh/km']
