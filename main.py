@@ -23,7 +23,18 @@ if __name__ == "__main__":
     import BEV_footprints_calculations as calc
     import BEV_visualization as viz
 
+    # define electricity mix parameters and BEV/ICEV parame5ters
     el_experiments = {'baseline': [2019]}
+    BEV_experiments = {
+                       'baseline': [180000, 180000, True],
+                       'Moro_Lonza': [180000, 180000, False],
+                       'long_BEV_life': [250000, 180000, True],
+                       'short_BEV_life': [150000, 180000, True],
+                       'long_BEV_life_ML': [250000, 180000, False],
+                       'short_BEV_life_ML': [150000, 180000, False]
+                      }
+
+
     # TODO: combine bentso_extract and entso_data_clean
     for el_exp, params in el_experiments.items():
         logging.info(f'Starting el_experiment {el_exp}')
@@ -39,14 +50,6 @@ if __name__ == "__main__":
         logging.info('Starting calculation of hybridized emission factors')
         hybrid.hybrid_emission_factors()
         hybrid.clean_impact_factors()
-
-
-        BEV_experiments = {
-                       'baseline': [180000, 180000, False]#,
-                       'flow_tracing': [180000, 200000, True],
-                       'long_BEV_life': [200000, 180000, False],
-                       'short_BEV_life': [160000, 180000, False]
-                      }
 
         for BEV_exp, params in BEV_experiments.items():
             print('Performing experiment ' + BEV_exp)
