@@ -40,23 +40,21 @@ def run_stuff(run_id, export_data=True, include_TD_losses=True, BEV_lifetime=180
 
     production, trades, trade_ef, country_total_prod_disagg, country_total_cons_disagg, g_raw, C = load_prep_el_data(fp)
     codecheck_file, elmixes, trade_only, country_el, CFEL, CFCI = el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, country_total_cons_disagg, g_raw, trades, trade_ef, include_TD_losses, export_data)  # Leontief electricity calculations
-    results_toSI, BEV_impacts, ICEV_total_impacts = BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, production_el_intensity, CFCI)
-    export_SI(run_id, results_toSI, production, trade_only, trades, C, CFEL, BEV_impacts)
-    pickle_results(run_id, results_toSI, CFEL, BEV_impacts, ICEV_total_impacts, codecheck_file, export_data)
+    results_toSI, ICEV_total_impacts, ICEV_prodEOL_impacts, ICEV_op_int = BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, production_el_intensity, CFCI)
+    pickle_results(run_id, results_toSI, CFEL, ICEV_total_impacts, codecheck_file, export_data)
+    SI_fp = export_SI(run_id, results_toSI, production, trades, C, CFEL)
 
 
 #%% Load and format data for calculations
 
 def load_prep_el_data(fp):
     fp_output = os.path.join(fp, 'output')
-    #fp_data = os.path.join(os.path.pardir, os.path.pardir, os.path.pardir, os.path.pardir, 'Data')
-    #fp_results = os.path.join(os.path.pardir, os.path.pardir, 'Results')
 
     # Output from bentso.py
     filepath_production = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
     filepath_intensities = os.path.join(fp_output, 'final_emission_factors.csv')
     filepath_trades = os.path.join(fp_output, 'trades.csv')
-    filepath_tradeonly_ef = os.path.join(fp_output, 'AL_HR_LU_TR_ef_hv.csv')
+    filepath_tradeonly_ef = os.path.join(fp_output, 'ecoinvent_ef_hv.csv')
 
     # read in production mixes (annual average)
     production = pd.read_csv(filepath_production, index_col=0)
@@ -76,9 +74,6 @@ def load_prep_el_data(fp):
     country_total_prod_disagg = production.sum(axis=1)
     country_total_cons_disagg = country_total_prod_disagg + imports - exports
 
-    # country_total_cons = country_total_cons_disagg.copy()
-    # country_total_prod = country_total_prod_disagg.copy()
-
     waste = (production['Waste'] / production.sum(axis=1))
     waste_min = waste[waste > 0].min()
     waste_max = waste.max()
@@ -92,8 +87,8 @@ def load_prep_el_data(fp):
     all_C.drop(index='CY', inplace=True)
 
     # use ecoinvent factors for these countries as a proxy to calculate consumption mixes for receiving countries
-    trade_ef = pd.read_csv(filepath_tradeonly_ef, index_col=[0, 1, 2, 3], header=None)
-    trade_ef.index = trade_ef.index.droplevel([0, 1, 3])
+    trade_ef = pd.read_csv(filepath_tradeonly_ef, index_col=[0, 1, 2, 3], header=[0])
+    trade_ef.index = trade_ef.index.droplevel([0, 1, 3])  # remove DSID, activityName and productName (leaving geography)
     trade_ef.index.rename('geo', inplace=True)
     trade_ef.columns = ['emission factor']
 
@@ -290,7 +285,7 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     fp_data = os.path.join(fp, 'data')
     vehicle_fp = os.path.join(fp_data, 'car_specifications.xlsx')
     cars = pd.read_excel(vehicle_fp, index_col=[0, 1, 2], usecols='A:G')
-
+    cars = cars.sort_index()
     vehicle_CO2 = ["BEV", "ICEV"]
 
     # Impacts from electricity demand in cell production
@@ -339,11 +334,14 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
 
     BEV_use = (segs.multiply(elmixes_for_calc / 1000)).T
 
-    # Add production and EOL BEV
+    # Add production and EOL intensity for BEVs
     BEV_other = BEV_prod_impacts + cars.loc["BEV", "EOL", "t CO2"].values
     BEV_other_intensity = BEV_other / BEV_lifetime * 1e6  # in g CO2-eq
     BEV_other_intensity.index = ["g CO2/km"]
 
+    # Calculate full lifecycle intensity using production and consumption mixes
+    BEVp = pd.DataFrame(BEV_use["Production mix intensity"] + BEV_other_intensity.loc["g CO2/km"])
+    BEVc = pd.DataFrame(BEV_use["Consumption mix intensity"] + BEV_other_intensity.loc["g CO2/km"])
 
     # BEV impacts with production and consumption mixes
     # Check which technology lifetime to use as baseline for use phase
@@ -366,10 +364,6 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     BEV_use_sharesp = (BEV_use['Production mix intensity'] * lifetime / 1e6) / (BEV_impactsp.T)
     BEV_use_sharesc = (BEV_use['Consumption mix intensity'] * lifetime / 1e6) / (BEV_impactsc.T)
 
-
-    # Calculate full lifecycle intensity using production and consumption mixes
-    BEVp = pd.DataFrame(BEV_use["Production mix intensity"] + BEV_other_intensity.loc["g CO2/km"])
-    BEVc = pd.DataFrame(BEV_use["Consumption mix intensity"] + BEV_other_intensity.loc["g CO2/km"])
 
     #%%
 
@@ -398,7 +392,7 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     elif ICEV_lifetime > BEV_lifetime:
         # need to compare vehicles based on equal distance driven
         ICEV_total_impacts = ICEV_prodEOL_impacts.add(cars.loc['ICEV', 'Use phase', 'g CO2/km' ] * BEV_lifetime / 1e6, axis=0)
-        ICEV_prod_EOL_fp = ICEV_prodEOL_impacts * 1e6 / BEV_lifetime
+        ICEV_prod_EOL_fp = ICEV_prodEOL_impacts * 1e6 / ICEV_lifetime
 
     ICEV_lc_footprint = ICEV_prod_EOL_fp + cars.loc['ICEV', 'Use phase', 'g CO2/km']
     ICEV_total_impacts = pd.DataFrame(ICEV_total_impacts).T  # force to dataframe
@@ -458,7 +452,8 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     RATIOS = RATIOS.swaplevel(axis=1).sort_index(axis=1, level="Segment", sort_remaining=False)
     RATIOS = pd.concat({"RATIO BEV:ICEV": RATIOS}, axis=1)
 
-    results = fp.join(RATIOS)
+    results = fp.join(pd.concat({'BEV impacts': BEV_impacts}, axis=1, names=['', 'Elmix', 'Segment']))
+    results = results.join(RATIOS)
     results = results.join(ratio_use_cons)
     results = results.join(BEV_prod_EU)
     results = results.join(EU_BEVc)
@@ -468,22 +463,32 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
 
     results_toSI = results.copy()
 
-    return results_toSI, BEV_impacts, ICEV_total_impacts
+    return results_toSI, ICEV_total_impacts, ICEV_prodEOL_impacts, cars.loc['ICEV', 'Use phase', 'g CO2/km']
 
 
 #%% Export functions
-def export_SI(run_id, results_toSI, production, trade_only, trades, C, CFEL, BEV_impacts):
+def export_SI(run_id, results_toSI, production, trades, C, CFEL):
     """ Format dataframes for export to SI tables """
 
-    country_intensities = C.round(0).fillna(value='-').T
+    drop_countries = production.loc[production.sum(axis=1)==0].index
 
-    country_intensities.drop(index=trade_only, inplace=True)
-    production.drop(index=trade_only, inplace=True)  # drop countries with no production data
-    trades_forSI = trades.round(2).replace(0, np.nan).fillna(value='-')
-    production = production.round(2).replace(0, np.nan).fillna(value='-')
     CFEL_toSI = CFEL[['Production mix intensity', 'Consumption mix intensity']]  # CFPI.join(CFCI)
-    for country in trade_only:
-        CFEL_toSI.loc[country, 'Consumption mix intensity'] = np.nan
+    CFEL_toSI = CFEL_toSI.round(0)
+    CFEL_toSI.loc[drop_countries, 'Consumption mix intensity'] = '-'  # remove ecoinvent-based countries
+
+    country_intensities = C.round(0).fillna(value='-').T
+    country_intensities.drop(index=drop_countries, inplace=True)
+
+    production.drop(index=drop_countries, inplace=True)  # drop countries with no production data
+    production = production.round(2).replace(0, np.nan).fillna(value='-')
+
+    trades_forSI = trades.round(2).replace(0, np.nan).fillna(value='-')
+    trades_forSI = pd.concat([trades_forSI], keys=['Exporting countries'])
+    trades_forSI = pd.concat([trades_forSI], keys=['Importing countries'], axis=1)
+
+    trade_pct = CFEL['trade percentage']
+    trade_pct.replace(np.inf, np.nan, inplace=True)
+    trade_pct.dropna(how='all', inplace=True)
 
     # Export results for SI tables
     keeper = run_id + " {:%d-%m-%y, %H_%M}".format(datetime.now())
@@ -492,38 +497,39 @@ def export_SI(run_id, results_toSI, production, trade_only, trades, C, CFEL, BEV
     results_file = os.path.join(fp_results, 'SI_results ' + keeper + '.xlsx')
     writer = pd.ExcelWriter(results_file)
 
-    table5 = results_toSI.loc(axis=1)['BEV footprint', :, 'Consumption mix'].round(0)
-    table6 = results_toSI.loc(axis=1)['RATIO BEV:ICEV', :, 'Consumption mix'].round(2)
-    table7 = results_toSI.loc(axis=1)['EUR production impacts BEV', :, 'Consumption mix'].round(1)
-    table8 = results_toSI.loc(axis=1)['BEV footprint, EUR production', :, 'Consumption mix'].round(0)
-    table9 = BEV_impacts.loc(axis=1)[:, 'Consumption mix'].round(1)
+    results_toSI.drop(index=drop_countries, inplace=True) # remove ecoinvent-based countries
+    table6 = results_toSI.loc(axis=1)['BEV footprint', :, 'Consumption mix'].round(0)
+    table7 = results_toSI.loc(axis=1)['BEV impacts', :, 'Consumption mix'].round(1)
+    table8 = results_toSI.loc(axis=1)['RATIO BEV:ICEV', :, 'Consumption mix'].round(2)
+    table9 = results_toSI.loc(axis=1)['EUR production impacts BEV', :, 'Consumption mix'].round(1)
+    table10 = results_toSI.loc(axis=1)['BEV footprint, EUR production', :, 'Consumption mix'].round(0)
 
     # Write to Excel
-    CFEL_toSI.round(0).to_excel(writer, 'Table 1')
-    country_intensities.sort_index().to_excel(writer, 'Table 2 - intensity matrix')
-    production.to_excel(writer, 'Table 3 - Production mix')
-    trades_forSI.to_excel(writer, 'Table 4 - trades')
-    table5.droplevel(level=[2], axis=1).to_excel(writer, 'Table 5 - BEV fp')
-    table6.droplevel(level=[2], axis=1).to_excel(writer, 'Table 6 - ratio')
-    table7.droplevel(level=[2], axis=1).to_excel(writer, 'Table 7 - EUR prod imp')
-    table8.droplevel(level=[2], axis=1).to_excel(writer, 'Table 8 - EUR prod fp')
-    table9.droplevel(level=[1], axis=1).to_excel(writer, 'Table 9 - LC impacts')
+    CFEL_toSI.to_excel(writer, 'Table S1 - El footprints')
+    country_intensities.sort_index().to_excel(writer, 'Table S2 - intensity matrix')
+    production.to_excel(writer, 'Table S3 - Production mix')
+    trades_forSI.to_excel(writer, 'Table S4 - trades')
+    trade_pct.to_excel(writer, 'Table S5 - trade shares')
+    table6.droplevel(level=[2], axis=1).to_excel(writer, 'Table S6 - BEV fp')
+    table7.droplevel(level=[1], axis=1).to_excel(writer, 'Table S7 - Abs BEV impacts')
+    table8.droplevel(level=[2], axis=1).to_excel(writer, 'Table S8 - ratio')
+    table9.droplevel(level=[2], axis=1).to_excel(writer, 'Table S9 - EUR prod imp')
+    table10.droplevel(level=[2], axis=1).to_excel(writer, 'Table S10 - EUR prod fp')
 
     writer.save()
 
+    return results_file
 
-def pickle_results(run_id, results_toSI, CFEL, BEV_impacts, ICEV_total_impacts, codecheck_file, export_data):
+
+def pickle_results(run_id, results_toSI, CFEL, ICEV_total_impacts, codecheck_file, export_data):
     # Export for figures
     fp = os.path.abspath(os.path.curdir)
     fp_output = os.path.join(os.path.curdir, 'output')
     os.chdir(fp_output)
 
     keeper = run_id + ' country-specific indirect'
-    # results.to_pickle(keeper + '_BEV.pkl')
     results_toSI.to_pickle(keeper + '_BEV.pkl')
     CFEL.to_pickle(keeper + '_el.pkl')
-    export_BEV_impacts = BEV_impacts.drop('Production mix', level=1, axis=1).droplevel(1, axis=1).T
-    export_BEV_impacts.to_pickle(keeper + '_BEV_impacts_consumption.pkl')
     ICEV_total_impacts.to_pickle(keeper + '_ICEV_impacts.pkl')
 
     if export_data:

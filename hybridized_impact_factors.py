@@ -69,8 +69,8 @@ def hybrid_emission_factors():
 
     # manual workaround for keeping CH pumped hydro after removing unneeded rows
     # (since this ecoinvent process apparently does not contribute to any electricity mixes in ecoinvent)
-    ind ='69ccf019-081e-42e3-b7f5-879dc7dde86a_66c93e71-f32b-4591-901c-55395db5c132'  # Activityid for Swiss pumped hydro
-    col = df.columns.get_loc('54ed269b-e329-469c-902e-a8991ee7d24a_66c93e71-f32b-4591-901c-55395db5c132')
+    ind =('69ccf019-081e-42e3-b7f5-879dc7dde86a_66c93e71-f32b-4591-901c-55395db5c132', 'electricity production, hydro, pumped storage', 'CH', 'electricity, high voltage')  # Activityid for Swiss pumped hydro
+    col = df.columns.get_loc(('54ed269b-e329-469c-902e-a8991ee7d24a_66c93e71-f32b-4591-901c-55395db5c132', 'electricity, high voltage, production mix', 'CH', 'electricity, high voltage'))
     index = df.index.get_loc(ind)
     df.iloc[index, col] = 1e-7
 
@@ -165,7 +165,7 @@ def hybrid_emission_factors():
     for tec in ecoinvent_tecs:
         for keyword in tec_list:
             if keyword in tec and tec not in matches:
-                print(f'{keyword} is in {tec}')
+#                print(f'{keyword} is in {tec}')
                 matches.append(tec)
                 match_keys.append(temp_tecdict[keyword])
                 num_matches[keyword] += 1
@@ -296,7 +296,7 @@ def hybrid_emission_factors():
     no_ef = pd.DataFrame({k:pd.Series(v[:13]) for k, v in countries_missing_ef.items()})
 
 
-    # ## Calculate LC emissions for trade countries
+    # ## Calculate LC emissions for production mix for countries with missing production data
 
     trade_only = ['AL','BY','HR','LU','MD','MT','RU','TR','UA']
     low_volt = labels.loc[labels['activityName'] == 'market for electricity, low voltage']
@@ -321,23 +321,26 @@ def hybrid_emission_factors():
     hv_mix_ef = hv_mix_ef * 1000
     trade_mixes_comp = trade_mixes_comp * 1000
 
+    # Calculate mean technology footprints as quick check
+    ef_aggregated.replace(0, np.nan).mean(axis=1)
+
     fp_results = os.path.join(os.path.curdir,'results')
 
     with pd.ExcelWriter(os.path.join(fp_results, 'hybrid_emission_factors_final.xlsx')) as writer:
         ef_countries.to_excel(writer, sheet_name='country_emission_factors')
         no_ef.to_excel(writer, sheet_name='missing_emission_factors')
-        lv_mix_ef.to_excel(writer, sheet_name='AL_HR_LU_TR ef')
-        hv_mix_ef.to_excel(writer, sheet_name='AL_HR_LU_TR ef_hv')
+        lv_mix_ef.to_excel(writer, sheet_name='ecoinvent ef')
+        hv_mix_ef.to_excel(writer, sheet_name='ecoinvent ef_hv')
         trade_mixes_comp.to_excel(writer, sheet_name='trade_mixes_from_ei')
         ei_tec_table.to_excel(writer, sheet_name='correspondence table')
+        ef_aggregated.to_excel(writer, sheet_name='mean tech fps')
 
-    ef_countries.to_csv(os.path.join(fp_results, 'country_emission_factors.csv'))
-    no_ef.to_csv(os.path.join(fp_results, 'missing_emission_factors.csv'))
-    lv_mix_ef.to_csv(os.path.join(fp_results, 'AL_HR_LU_TR_ef_lv.csv'))  # used in BEV_footprints_calculations
-    hv_mix_ef.to_csv(os.path.join(fp_results, 'AL_HR_LU_TR_ef_hv.csv'))  # used in BEV_footprints_calculations
+    # Export to .csv for use in BEV_footprints_calculations
+    hv_mix_ef.to_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'))  # used in BEV_footprints_calculations
+    ef_countries.to_csv(os.path.join(fp_output, 'country_emission_factors.csv'))  # used in clean_impact_factors
+    no_ef.to_csv(os.path.join(fp_output, 'missing_emission_factors.csv'))  # used in clean_impact_factors
+#    lv_mix_ef.to_csv(os.path.join(fp_results, 'ecoinvent_ef_lv.csv'))
 
-    # Calculate mean technology footprints as quick check
-    ef_aggregated.replace(0, np.nan).mean(axis=1)
 
     return ef_countries, no_ef
 
