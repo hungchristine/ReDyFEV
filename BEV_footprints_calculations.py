@@ -252,6 +252,12 @@ def el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, 
     CFEL_mixes = elmixes.T
     CFEL = pd.concat([country_el, CFEL_mixes], axis=1)
 
+    imports = trades.sum(axis=0)
+    exports = trades.sum(axis=1)
+
+    CFEL['trade percentage'] = (imports + exports) / CFEL['Total production (TWh)'] * 100
+    CFEL['imports'] = imports
+    CFEL['exports'] = exports
     #%%
 
     #Calculate total carbon footprint intensity ratio production vs consumption
