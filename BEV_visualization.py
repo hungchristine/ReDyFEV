@@ -47,6 +47,8 @@ from matplotlib.ticker import AutoMinorLocator, FixedLocator
 import geopandas as gpd
 import seaborn as sns
 from palettable.cubehelix import Cubehelix
+from cmcrameri import cm
+
 
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDrawingArea
 from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
@@ -57,12 +59,12 @@ fp_data = os.path.join(fp, 'data')
 fp_output = os.path.join(fp, 'output')
 fp_results = os.path.join(fp, 'results')
 
-def visualize(experiment, export_figures=True, include_TD_losses=True, plot_ei=False):
-    fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment)
+def visualize(experiment, use_entso, export_figures=True, include_TD_losses=True, plot_ei=False):
+    fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment, use_entso)
     plot_all(experiment, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, plot_ei, include_TD_losses=include_TD_losses, export_figures=export_figures)
 
 
-def setup(experiment):
+def setup(experiment, use_entso):
 
     fp_figure = os.path.join(fp_results, 'figures')
     fp_experiment = os.path.join(fp_figure, experiment)
@@ -73,16 +75,22 @@ def setup(experiment):
         os.mkdir(fp_experiment)
 
     # Load all relevant results
-    fp_pkl = os.path.join(fp_output,
-                          experiment + ' country-specific indirect_el.pkl')
+    if use_entso:
+        el = experiment + ' country-specific indirect_el.pkl'
+        BEV = experiment + ' country-specific indirect_BEV.pkl'
+        ICE = experiment + ' country-specific indirect_ICEV_impacts.pkl'
+    else:
+        el = experiment + '_eurostat country-specific indirect_el.pkl'
+        BEV = experiment + '_eurostat country-specific indirect_BEV.pkl'
+        ICE = experiment + '_eurostat country-specific indirect_ICEV_impacts.pkl'
+
+    fp_pkl = os.path.join(fp_output, el)
     CFEL = pickle.load(open(fp_pkl, 'rb'))
 
-    fp_pkl = os.path.join(fp_output,
-                          experiment + ' country-specific indirect_BEV.pkl')
+    fp_pkl = os.path.join(fp_output, BEV)
     results = pd.read_pickle(fp_pkl)
 
-    fp_pkl = os.path.join(fp_output,
-                          experiment + ' country-specific indirect_ICEV_impacts.pkl')
+    fp_pkl = os.path.join(fp_output, ICE)
     ICEV_total_impacts = pickle.load(open(fp_pkl, 'rb'))
 
     mapping_data = map_prep(CFEL, results)
@@ -96,7 +104,12 @@ def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, pl
         ei_CFEL = CFEL.loc[ei_countries]
     else:
         mapping_data.loc[mapping_data['ISO_A2'].isin(ei_countries), 'Total production (TWh)':] = np.nan
-        results.drop(index=ei_countries, inplace=True)
+        for country in ei_countries:
+            try:
+                results.drop(index=country, inplace=True)
+            except KeyError:
+                print(f'{country} not in results')
+
         ei_CFEL = None
 
     CFEL.drop(index=ei_countries, inplace=True)  # drop ei-only countries regardless due to special treatment in Figure 1 (plotted separately)
@@ -106,10 +119,11 @@ def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, pl
 
     plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL)
     plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries)
-    plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries)
-    plot_fig5(exp, fp_figure, results, export_figures, orientation='horizontal')
+    plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries)
+    plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries)
+    plot_fig6(exp, fp_figure, results, export_figures, orientation='horizontal')
 
-    plot_el_trade(exp, fp_figure, CFEL, export_figures)
+    # plot_el_trade(exp, fp_figure, CFEL, export_figures)
 
 # %% Helper class for asymmetric normalizing colormaps
 
@@ -180,8 +194,8 @@ def plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL=N
 
 
     # Finally, plot Figure 1
-    cmap = Cubehelix.make(min_light=0, max_light=0.75, gamma=0.8, start=0, rotation=1.4, reverse=True, n=256)
-    mark_color = cmap.mpl_colormap
+    cmap = cm.oslo_r #Cubehelix.make(min_light=0, max_light=0.75, gamma=0.8, start=0, rotation=1.4, reverse=True, n=256)
+    mark_color = cmap #cmap.mpl_colormap
     sns.set_style('whitegrid')
 
     # Prep country marker sizes; for now, use same size for all axis types
@@ -223,7 +237,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
                       s=marker_size, alpha=0.5, norm=norm, c=net_trade, cmap=marker_clr, label='_nolegend_')"""
     norm = colors.Normalize(vmax=100)
     plot = ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                      s=marker_size, alpha=0.5, norm=norm, c=net_trade, cmap=marker_clr, label='_nolegend_')
+                      s=marker_size, alpha=0.8, norm=norm, c=net_trade, cmap=marker_clr, label='_nolegend_')
     ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
                s=2, c='k', alpha=0.9, edgecolor='k', label='_nolegend_')  # Include midpoint in figure
     if ei_CFEL is not None:
@@ -274,7 +288,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     for i, area in enumerate(legend_sizes):
         radius_pts = np.sqrt(area / 3.14)
         c1 = Circle((150, np.sqrt(area / 3.14) + 10), radius_pts,
-                    fc = '#89BEA3',
+                    fc = marker_clr(0.5),#'#89BEA3',
                     ec='k', lw=0.6, alpha=0.4)
         c2 = Circle((150, np.sqrt(area / 3.14) + 10), radius_pts,
                     fc="None", ec='k', lw=0.7, alpha=0.7)
@@ -319,7 +333,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     marker_size_ratio = (ax.get_xlim()[1] / (ax2.get_xlim()[1] - ax2.get_xlim()[0]))
 
     ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                s= (np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.5,
+                s= (np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.8,
                 norm=norm, c=net_trade, cmap=marker_clr, edgecolor='k', label='_nolegend_')
     ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
                 s=(np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.9,
@@ -396,7 +410,8 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     cbar_min = 0
     cbar_max = 100
     # Begin plotting colorbar
-    cbar = plt.colorbar(plot, cax=ax_cbar, drawedges=False, extend='max')#, use_gridspec=True)
+    cbar = plt.colorbar(plot, cax=ax_cbar, drawedges=False,
+                        format=ticker.PercentFormatter(), extend='max')#, use_gridspec=True)
     cbar.set_label('Electricity traded, as % of net production', fontsize=18, rotation=90, labelpad=8)
 
     cbar.set_alpha(1)
@@ -406,7 +421,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     cbar.draw_all()
 
     # Manually tack on semi-transparent rectangle on colorbar to match alpha of plot; workaround for weird rendering of colorbar with alpha
-    r1 = Rectangle((9, 0), 85, 500, fc='w', alpha=0.3)
+    r1 = Rectangle((9, 0), 85, 500, fc='w', alpha=0.2)
     ax_cbar.add_patch(r1)
 
     if export_figures:
@@ -417,8 +432,8 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     plt.show()
 
 
-# %% Figure 5 (differences for domestic production)
-def plot_fig5(exp, fp_figure, results, export_figures, orientation='both'):
+# %% Figure 6 (differences for domestic production)
+def plot_fig6(exp, fp_figure, results, export_figures, orientation='both'):
     sns.set_style('whitegrid')
     A_diff = (results['BEV footprint, EUR production - Segment A - Consumption mix'] -
               results['BEV footprint - Segment A - Consumption mix']) / results['BEV footprint - Segment A - Consumption mix']
@@ -674,30 +689,44 @@ def annotate_map(ax, countries, mapping_data, values, cmap_range, threshold=0.8,
 
 
 def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
-    sns.set_style('dark')
+    # sns.set_style('dark')
     vmin = 50
     vmax = 375
-    threshold = 0 # threshold for switching annotation colours
+    threshold = 4/6 # threshold for switching annotation colours
 
     mpl.rcParams['hatch.linewidth'] = 0.2
 
-    cmap = colors.ListedColormap(['#4e7496',  # blue
-                                  '#438e83',
-                                  '#3F8638',
-                                  '#737D2F',
-                                  '#734126',
-                                  '#681E3E'  # red
-                                 ])
+    # cmap = colors.ListedColormap(['#4e7496',  # blue
+    #                               '#438e83',
+    #                               '#3F8638',
+    #                               '#737D2F',
+    #                               '#734126',
+    #                               '#681E3E'  # red
+    #                               ])
+
+    cmap = colors.ListedColormap(["#c6baca",  # light purple
+                                  "#83abce",
+                                  "#6eb668",
+                                  "#9caa41",
+                                  "#815137",
+                                  "#681e3e"  # red
+                                  ])
 
     cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]  # retrieve colormap colors
     cmap = cmap_col
+
+    # cmap = cm.bamako
+    # cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]
+    # cmap = cmap_col
+
 
     # Make manual boundaries for cmap
     # range of negative values approximately 1/3 of that of positive values;
     # cut-off colormap for visual 'equality'
 
     boundaries = [i for i in np.arange(vmin, vmax, 50)]  # define boundaries of colormap transitions
-    cmap_BEV, norm = colors.from_levels_and_colors(boundaries, colors=[cmap[0]]+ cmap + [cmap_col[-1]], extend='both')
+    cmap_BEV, norm = colors.from_levels_and_colors(boundaries, colors=[cmap[0]]+ cmap + [cmap[-1]], extend='both')
+    # cmap_BEV, norm = colors.from_levels_and_colors(boundaries, colors=[cmap[0]]+ cmap + [cmap_col[-1]], extend='both')
 
     max_fp = max(mapping_data['BEV footprint - Segment A - Production mix'].max(),
                  mapping_data['BEV footprint - Segment A - Consumption mix'].max(),
@@ -739,7 +768,6 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
     axes[0, 0].set_title('A-segment (mini)', fontsize=13.5)
     axes[0, 1].set_title('F-segment (luxury)', fontsize=13.5)
 
-
     plt.yticks([])
     plt.xticks([])
 
@@ -768,15 +796,78 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
 
     plt.show()
 
-# %% Figure 3 - Absolute mitigation by electrification
-def plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries):
+
+#%%  Plot share of production emissions
+def plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries):
+    threshold = 0.75
+
+    col_list = ['Production as share of total footprint - Segment A - Consumption mix',
+                'Production as share of total footprint - Segment C - Consumption mix',
+                'Production as share of total footprint - Segment D - Consumption mix',
+                'Production as share of total footprint - Segment F - Consumption mix']
+
+    fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, squeeze=True,
+                             gridspec_kw={'wspace': 0.03, 'hspace': 0.03},
+                             figsize=(9.5, 8), dpi=600)
+
+    # print(mapping_data[col_list])
+
+    for col, ax in zip(col_list, axes.flatten()):
+        mapping_data[mapping_data[col].isna()].plot(ax=ax, color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
+        mapping_data[mapping_data[col].notna()].plot(ax=ax, column=col, cmap=cm.batlow_r, vmax=1, vmin=0, edgecolor='k', linewidth=0.3, alpha=0.8)
+
+        if ei_countries is not None:
+            mapping_data.loc[mapping_data['ISO_A2'].isin(ei_countries)].plot(ax=ax, column=col, facecolor='none', edgecolor='darkgrey', linewidth=0.3, hatch=5*'.', alpha=0.5, zorder=1)
+            mapping_data[mapping_data['ISO_A2'].isin(ei_countries)].plot(ax=ax, linewidth=0.3, facecolor='none', edgecolor='k', alpha=1)
+
+        annotate_map(ax,
+                     mapping_data[mapping_data[col].notna()].index.to_list(),
+                     mapping_data,
+                     mapping_data[mapping_data[col].notna()][col].values*100,
+                     100,
+                     threshold=threshold,
+                     round_dig=0,
+                     ei_countries=ei_countries
+                     )
+
+    plt.xlim((-12, 34))
+    plt.ylim((32, 75))
+
+    plt.yticks([])
+    plt.xticks([])
+
+    captions = ['(a) A-segment (mini)', '(b) C-segment (medium)',
+                '(c) D-segment (large)', '(d) F-segment (luxury)']
+
+    for i, a in enumerate(fig.axes):
+        a.annotate(captions[i], xy=(0.02, 0.92), xycoords='axes fraction', fontsize=12)
+
+
+    sns.reset_orig()
+    cb = plt.cm.ScalarMappable(cmap=cm.batlow_r, norm=colors.Normalize(0,100))
+    cb.set_array([])
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
+    cbar = fig.colorbar(cb, cax=cbar_ax, format=ticker.PercentFormatter())
+    cbar.set_alpha(0.7)
+    cbar.set_label('Production share of total lifecycle emissions, \n in %', rotation=90, labelpad=9, fontsize=12)
+    cbar.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+
+    if export_figures:
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig_3 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_3 ' + keeper), bbox_inches='tight')
+
+
+# %% Figure 4 - Absolute mitigation by electrification
+def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries):
     # # Make multiple versions of Figure 3
     #
     # First, with A-segment ratios and the difference of A- and F-segments (delta)
     # Second, with A-segment and F-segment ratios (original Figure 3) + separate delta figure
     # Third, with absolute difference between BEV and ICEV for both panels
 
-    sns.set_style('dark')
+    # sns.set_style('dark')
     threshold=0.8
 
     mapping_data['abs_diff_A'] = ICEV_total_impacts['A'].reindex_like(mapping_data, method='pad').subtract(mapping_data['BEV impacts - Segment A - Consumption mix'])
@@ -874,19 +965,20 @@ def plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
 
     if export_figures:
         keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff ' + keeper), bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig 4- abs_diff ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig 4- abs_diff ' + keeper), bbox_inches='tight')
 
     plt.show()
 
-#%% Figure 4 - sensitivity with vehicle lifetimes
-def plot_fig4(results, export_figures, fp_figure=fp_results):
+#%% Figure 5 - sensitivity with vehicle lifetimes
+def plot_fig5(results, export_figures, fp_figure=fp_results):
     sns.set_style('whitegrid')
 
     clrs = ['#2e78b8','#206619', '#555c23', '#b8145b']  # colours for ICEV lines
     clrs2 = ['#4e7496', '#3F8638', '#737D2F', '#681E3E']  # colours for BEV ranges
     fig_dict = {'baseline':['baseline', 'short_BEV_life', 'long_BEV_life'],
-                'ML':['Moro_Lonza','long_BEV_life_ML','short_BEV_life_ML']}
+                'ML':['Moro_Lonza','long_BEV_life_ML','short_BEV_life_ML'],
+                'energy':['baseline_energy', 'short_BEV_life_energy', 'long_BEV_life_energy']}
     for el_approach in fig_dict.keys():
         baseline, short_BEV_life, long_BEV_life = fig_dict[el_approach]
         fig, axes = plt.subplots(2, 2, figsize=(15, 8), gridspec_kw={'wspace': 0.05, 'hspace': 0.075}, sharex=True, sharey=True)
@@ -911,12 +1003,13 @@ def plot_fig4(results, export_figures, fp_figure=fp_results):
 
             ax.tick_params(axis='x', which='major', pad=3)
             ax.set_xticks(x_coords)
-            ax.set_xticklabels(labels, rotation=90, va='baseline')
+            ax.set_xticklabels(labels, rotation=90, va='top', ha='center')
 
             if seg == 'D' or seg=='F':
                 ax.set_xlabel('Country', fontsize=13, labelpad=10)
 
         ax.set_xlim(left=-0.6, right=29.6)
+        ax.set_ylim(top=375)
 
         # set up segment labels for each subplot
         captions = ['(a) A-segment (mini)', '(b) C-segment (medium)',
@@ -964,12 +1057,13 @@ def plot_fig4(results, export_figures, fp_figure=fp_results):
 
         if export_figures:
             keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-            plt.savefig(os.path.join(fp_figure, 'Fig 4 - sensitivity ' + el_approach + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-            plt.savefig(os.path.join(fp_figure, 'Fig 4 - sensitivity ' + el_approach + keeper), bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig 5 - sensitivity ' + el_approach + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig 5 - sensitivity ' + el_approach + keeper), bbox_inches='tight')
 
         plt.show()
 
 
+#%%
 def sensitivity_plot_lecture(results, export_figures, fp_figure=fp_results):
     clrs = ['#2e78b8','#206619', '#555c23', '#b8145b']  # colours for ICEV lines
     clrs2 = ['#4e7496', '#3F8638', '#737D2F', '#681E3E']  # colours for BEV ranges

@@ -62,10 +62,15 @@ def aggregate_entso(dictionary, start=None, end=None):
             # Make sure timesteps are all equal length before calculating
             # NB: this is made obsolete by using bentso's fullyear=True
             if checkEqual(timestep_list):
-                if (isinstance(value, pd.DataFrame)) and (value.columns.str.contains('Hydro Pumped Storage').sum() == 1):
-                    # check if value is the production matrix and if so, if the country has pumped storage
-                    logging.info(f'Correcting for negative pumped hydropower in {key}')
-                    value = value.apply(distribute_neg_hydro, axis=1)  # correct for negative pumped hydro
+                if (isinstance(value, pd.DataFrame)):
+                    # ENTSO-E data from 2020 introduces MultiIndex headers
+                    if type(value.columns) == pd.MultiIndex:
+                        value = value.loc(axis=1)[:, 'Actual Aggregated']  # drop "Actual Consumption"
+                        value.columns = value.columns.droplevel(1)
+                    if (value.columns.str.contains('Hydro Pumped Storage').sum() == 1):
+                        # check if value is the production matrix and if so, if the country has pumped storage
+                        logging.info(f'Correcting for negative pumped hydropower in {key}')
+                        value = value.apply(distribute_neg_hydro, axis=1)  # correct for negative pumped hydro
                 summed_dict[key] = (value * timestep_list[0] / 1e6).sum() # To calculate electricity generated; take power per timestep and multiply by length of time period. Sum over whole year
                 new_dict[key] = value
             else:
@@ -99,15 +104,15 @@ def build_trade_mat(trade_dict):
 
 
  #%%
-def clean_entso(start=None, end=None):
+def clean_entso(year, start=None, end=None):
     fp = os.path.abspath(os.path.curdir)
     fp_output = os.path.join(os.path.curdir, 'output')
     os.chdir(fp_output)
 
-    ## Load previous results
-    with open(r'entso_export_trade.pkl', 'rb') as handle:
+    ## Load raw results from Transparency Portal
+    with open(r'entso_export_trade_' + str(year) + '.pkl', 'rb') as handle:
         trade_dict = pickle.load(handle)
-    with open(r'entso_export_gen.pkl', 'rb') as handle:
+    with open(r'entso_export_gen_' + str(year) + '.pkl', 'rb') as handle:
         gen_dict = pickle.load(handle)
 
     generation = gen_dict.copy()
@@ -126,16 +131,16 @@ def clean_entso(start=None, end=None):
         for which the latter has higher production values (which agree better with statistical
         production from 2018)
     """
+    # NB: country results are perhaps not incorrect after all...
+    # fp_ie = os.path.join(fp, 'data', 'gen_IE.csv')
+    # new_ie = pd.read_csv(fp_ie)
+    # new_ie = new_ie.set_index('MTU', drop=True, append=False).drop('Area', axis=1)
+    # new_ie = new_ie.replace('n/e', np.nan)
+    # new_ie = (new_ie * 0.5).sum() / 1e6  # samples on the half hour
+    # new_ie = new_ie.drop(index='Marine  - Actual Aggregated [MW]')
+    # new_ie.index = gen_df.columns
 
-    fp_ie = os.path.join(fp, 'data', 'gen_IE.csv')
-    new_ie = pd.read_csv(fp_ie)
-    new_ie = new_ie.set_index('MTU', drop=True, append=False).drop('Area', axis=1)
-    new_ie = new_ie.replace('n/e', np.nan)
-    new_ie = (new_ie * 0.5).sum() / 1e6  # samples on the half hour
-    new_ie = new_ie.drop(index='Marine  - Actual Aggregated [MW]')
-    new_ie.index = gen_df.columns
-
-    gen_df.loc['IE'] = new_ie
+    # gen_df.loc['IE'] = new_ie
 
     """ Aggregate GB and GB_NIR regions """
     gen_df = (gen_df.reset_index().replace({'index': {'GB-NIR':'GB'}}).groupby('index', sort=False).sum())
@@ -151,9 +156,9 @@ def clean_entso(start=None, end=None):
     for country in add_countries:
         gen_df.loc[country] = 0
 
-    with open(r'trade_final.pkl', 'wb') as handle:
+    with open(r'trade_final_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(trade_df, handle)
-    with open(r'gen_final.pkl', 'wb') as handle:
+    with open(r'gen_final_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(gen_df, handle)
 
     logging.info('Completed export of ENTSO-E data')

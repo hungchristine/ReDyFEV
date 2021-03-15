@@ -9,7 +9,7 @@ import logging
 fp_results = os.path.join(os.path.curdir, 'results')
 fp_output = os.path.join(os.path.curdir, 'output')
 
-def hybrid_emission_factors(trade_only):
+def hybrid_emission_factors(trade_only, use_entso, year=''):
     # append pylcaio folder with hybridized LCI processes
     sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
     import pylcaio
@@ -76,7 +76,7 @@ def hybrid_emission_factors(trade_only):
 
     df = df.replace(0, np.nan).dropna(how='all', axis=0)
 
-    # ### Filter for medium-voltage mixes ( to find waste incineration shares)
+    # ### Filter for medium-voltage mixes (to find waste incineration shares)
     df_waste = df_waste.loc[:, df_waste.columns.isin(country_list, level=2)]
     df_waste = df_waste.replace(to_replace=0, value=np.nan).dropna(how='all', axis=0)
 
@@ -87,7 +87,7 @@ def hybrid_emission_factors(trade_only):
     df_solar = df_solar.loc[:, df_solar.columns.isin(country_list, level=2)]
     df_solar = df_solar.replace(to_replace=0, value=np.nan).dropna(how='all', axis=0)
 
-    # ### Develop correspondence between ecoinvent and ENTSO-E technology categories
+    # ### Develop correspondence between ecoinvent and ENTSO-E/Eurostat technology categories
 
     # Correspondence from ENTSO-E technology categories to keywords for searching in ecoinvent processes
     # Note that the 'fossil oil shale', 'other' and 'other renewable' do not have ecoinvent equivalents;
@@ -148,7 +148,7 @@ def hybrid_emission_factors(trade_only):
 
     # Get list of solar PV processes in ecoinvent
     d = list(set(df_solar.index.get_level_values(level=1)))
-    pv = [entry for entry in d if 'electricity production' in entry] #all low-voltage production technologies
+    pv = [entry for entry in d if 'electricity production' in entry] # all low-voltage production technologies
 
     # Fetch waste incineration process names
     waste = ['electricity, from municipal waste incineration to generic market for electricity, medium voltage']
@@ -180,7 +180,7 @@ def hybrid_emission_factors(trade_only):
     # Correspondence of ENTSO-E categories and specific ecoinvent processes
     from collections import defaultdict
 
-    ei_tec_dict = defaultdict(list) # keys as entso-e categories, values are corresponding ei
+    ei_tec_dict = defaultdict(list) # keys as entso-e categories, values are corresponding ei activities
     rev_ei_tec_dict = defaultdict(list) # vice-versa; keys as ei, values are entso-e categories
     for i, j in zip(match_keys, matches):
         ei_tec_dict[i].append(j)
@@ -237,8 +237,7 @@ def hybrid_emission_factors(trade_only):
     g_temp = ei_process_shares.reset_index(level=[1,2,3,4], drop=True)
 
 
-    # ### Calculate weighted average, hybridized emissions factor for each technology
-
+    # ### Calculate weighted average of hybridized emissions factor for each technology
     ef = ei_process_shares.mul(hybrid_temp.iloc[:, 0], axis=0, level=0)
 
     ef_aggregated = ef.groupby(level='entso_e').sum()
@@ -251,13 +250,27 @@ def hybrid_emission_factors(trade_only):
     ef_countries = ef_countries.T
     ef_countries.sort_index(axis=0, inplace=True)
 
-    entso_fp = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
-    entso_e_production = pd.read_csv(entso_fp, header=0, index_col=[0])
-    entso_e_production.replace(0, np.nan,inplace=True)
+    if use_entso:
+        # entso_fp = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
+        # entso_e_production = pd.read_csv(entso_fp, header=0, index_col=[0])
+        entso_fp = os.path.join(fp_output, 'gen_final_' + str(year) + '.pkl')
+    else:
+        entso_fp = os.path.join(fp_output, 'gen_final_eurostat.pkl')
+
+    with open(entso_fp, 'rb') as handle:
+        entso_e_production = pickle.load(handle)
+
+    entso_e_production.replace(0, np.nan, inplace=True)
     entso_mask = entso_e_production.isna().sort_index()
     ef_mask = ef_countries.sort_index().isna()
 
-    entso_mask.drop(columns=['Fossil Oil shale', 'Other', 'Other renewable', 'Marine'], inplace=True)
+    # remove these technologies as they have no equivalents in ecoinvent
+    remove_tecs_list = ['Fossil Oil shale', 'Other', 'Other renewable', 'Marine']
+    for tec in remove_tecs_list:
+        try:
+            entso_mask.drop(columns=tec, inplace=True)
+        except KeyError:
+            print(f"Could not remove {tec}; not in ENTSO-E/Eurostat production matrix")
 
     entso_mask.index.rename('geography', inplace=True)
     entso_mask.columns.rename('entso_e', inplace=True)
@@ -291,7 +304,7 @@ def hybrid_emission_factors(trade_only):
             if ef_mask.loc[country, tec]:
                 temp2.append(country)
         countries_missing_ef[tec] = temp2#.append(country)
-    countries_missing_ef
+    print(countries_missing_ef)
 
     no_ef = pd.DataFrame({k:pd.Series(v[:13]) for k, v in countries_missing_ef.items()})
 
@@ -306,11 +319,18 @@ def hybrid_emission_factors(trade_only):
     high_volt = labels.loc[labels['activityName'] == 'market for electricity, high voltage']
     trade_only_mixes_hv = high_volt.loc[high_volt['geography'].isin(trade_only)].index
     hv_mix_ef = D_labels.loc[trade_only_mixes_hv]
+    missing_mixes = list(set(trade_only) - set(hv_mix_ef.index.get_level_values('geography')))
+    for country in missing_mixes:
+        if country == 'AD':
+            ad = D_labels.loc[high_volt.loc[high_volt['geography']=='FR'].index]
+            hv_mix_ef = hv_mix_ef.append(ad)
+            hv_mix_ef.index = hv_mix_ef.index.set_levels(hv_mix_ef.index.levels[2].str.replace('FR', 'AD'), level=2)
 
     lv_mix_ef_comp = D_labels_comp[trade_only_mixes_lv]  # low voltage mixes, not used
     hv_mix_ef_comp = D_labels_comp[trade_only_mixes_hv]
 
     trade_mixes_comp = lv_mix_ef_comp.join(hv_mix_ef_comp)
+
 
     labels.loc[labels['activityName'] == 'electricity, from municipal waste incineration to generic market for electricity, medium voltage']
 
@@ -341,23 +361,33 @@ def hybrid_emission_factors(trade_only):
     no_ef.to_csv(os.path.join(fp_output, 'missing_emission_factors.csv'))  # used in clean_impact_factors
 #    lv_mix_ef.to_csv(os.path.join(fp_results, 'ecoinvent_ef_lv.csv'))
 
-
     return ef_countries, no_ef
 
-def clean_impact_factors(trade_only):
-    with open(os.path.join(fp_output, 'gen_final.pkl'), 'rb') as handle:
-            gen_df = pickle.load(handle)
+def clean_impact_factors(year, trade_only, use_entso):
+    if use_entso:
+        gen_pickle = 'gen_final_' + str(year) + '.pkl'
+        trade_pickle = 'trade_final_' + str(year) + '.pkl'
+    else:
+        gen_pickle = 'gen_final_eurostat.pkl'
+        trade_pickle = 'trade_final_eurostat.pkl'
+    with open(os.path.join(fp_output, gen_pickle), 'rb') as handle:
+        gen_df = pickle.load(handle)
+
     gen_df.replace(0, np.nan, inplace=True)
 
-    with open(os.path.join(fp_output,'trade_final.pkl'), 'rb') as handle:
+    with open(os.path.join(fp_output, trade_pickle), 'rb') as handle:
         trade_df = pickle.load(handle)
 
     try:
         print('Calculating hybridized emission factors from pyLCAIO')
         # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
-        ef, missing_factors = hybrid_emission_factors(trade_only)
-    except:
+        if use_entso:
+            ef, missing_factors = hybrid_emission_factors(trade_only, use_entso, year)
+        else:
+            ef, missing_factors = hybrid_emission_factors(trade_only, use_entso)
+    except Exception as e:
         print('Calculating from pyLCAIO failed. Importing previously calculated emission factors instead')
+        print(e)
         # import ready-calculated emission factors if no access to pylcaio object
         ef = pd.read_csv(os.path.join(fp_output, 'country_emission_factors.csv'), index_col=[0])
         missing_factors = pd.read_csv(os.path.join(fp_output, 'missing_emission_factors.csv'), index_col=[0])
@@ -430,13 +460,18 @@ def clean_impact_factors(trade_only):
 
     # Export all data
     # .csv for use in BEV_footprints_calculations.py
+    if use_entso:
+        trade_df.to_csv(os.path.join(fp_output,'trades_' + str(year) + '.csv'))
+        gen_df.to_csv(os.path.join(fp_output,'ENTSO_production_volumes_' + str(year) + '.csv'))
+        ef.to_csv(os.path.join(fp_output,'final_emission_factors_' + str(year) + '.csv'))
+        excel_filename = 'entsoe_export_final_' + str(year) + '.xlsx'
+    else:
+        trade_df.to_csv(os.path.join(fp_output,'trades_eurostat.csv'))
+        gen_df.to_csv(os.path.join(fp_output,'production_volumes_eurostat.csv'))
+        ef.to_csv(os.path.join(fp_output,'final_emission_factors_eurostat.csv'))
+        excel_filename = 'eurostat_export_final.xlsx'
 
-    trade_df.to_csv(os.path.join(fp_output,'trades.csv'))
-    gen_df.to_csv(os.path.join(fp_output,'ENTSO_production_volumes.csv'))
-    ef.to_csv(os.path.join(fp_output,'final_emission_factors.csv'))
-
-
-    with pd.ExcelWriter(os.path.join(fp_results, 'entsoe_export_final.xlsx')) as writer:
+    with pd.ExcelWriter(os.path.join(fp_results, excel_filename)) as writer:
         trade_df.to_excel(writer, 'trade')
         gen_df.to_excel(writer, 'generation')
         ef.to_excel(writer,'new ef')

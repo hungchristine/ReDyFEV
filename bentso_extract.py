@@ -13,9 +13,6 @@ import pickle
 
 import logging
 
-from bentso import *
-from bentso import constants
-from bentso import iterators
 from bentso import CachingDataClient
 
 
@@ -27,22 +24,22 @@ fp_output = os.path.join(os.path.curdir, 'output')
 # #### Using Bentso
 
 country_list = ['AL', 'AT', 'BA', 'BE', 'BG',
-                 'CH', 'CZ', 'DE', 'DK', 'EE',
-                 'ES', 'FI', 'FR', 'GR', 'HR',
-                 'HU', 'IE', 'IT', 'LT', 'LU',
-                 'LV', 'ME', 'MK', 'NL', 'NO',
-                 'PL', 'PT', 'RO', 'RS', 'SE',
-                 'SI', 'SK', 'GB', 'TR', 'GE',
-                 'CY', 'HR', 'NI', 'GB-NIR',
-                 'BY', 'UA', 'MD', 'RU', 'MT', 'MD']
+                  'CH', 'CZ', 'DE', 'DK', 'EE',
+                  'ES', 'FI', 'FR', 'GR', 'HR',
+                  'HU', 'IE', 'IT', 'LT', 'LU',
+                  'LV', 'ME', 'MK', 'NL', 'NO',
+                  'PL', 'PT', 'RO', 'RS', 'SE',
+                  'SI', 'SK', 'GB', 'TR', 'GE',
+                  'CY', 'HR', 'NI', 'GB-NIR',
+                  'BY', 'UA', 'MD', 'RU', 'MT', 'MD']
 
 # smaller group for testing
-#country_list = ['AT']#,'FR', 'NO', 'AT']  # ,'DK','IT']
+# country_list = ['DE','FR', 'NL', 'AT']  # ,'DK','IT']
 
 """Fetch production mixes from Transparency Platform
    saves as dict of Dataframes.
 
-   NOTE 1: that GB only fetches
+   NOTE 1: for 2019, GB only fetches
    one of two bidding areas; both GB and GB-NIR required
    for full GB geographical resolution
 
@@ -62,7 +59,7 @@ def fetch_generation(year=2019, full_year=True):
             print(f'Warning: no data for generation in {country}!')
             logging.warning(f'No generation data for {country}')
             logging.warning(e)
-    with open(r'entso_export_gen.pkl', 'wb') as handle:
+    with open(r'entso_export_gen_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(gen_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     return gen_dict
 
@@ -84,7 +81,7 @@ def fetch_trade(year=2019, full_year=True):
                 logging.warning(f'Warning: {imp_country}-{exp_country} trade relationship does not exist!')
                 trade_dict[(exp_country, imp_country)] = np.nan
                 no_trade_rel.append((exp_country, imp_country))
-    with open(r'entso_export_trade.pkl', 'wb') as handle:
+    with open(r'entso_export_trade_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(trade_dict, handle)
     return trade_dict
 
@@ -98,6 +95,6 @@ def bentso_query(year=2019, full_year=True):
 
     os.chdir(fp)
 
-    return gen_dict#, trade_dict
+    return gen_dict, trade_dict
 
 #gen_dict = bentso_query()
