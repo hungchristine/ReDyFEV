@@ -67,13 +67,6 @@ def aggregate_entso(dictionary, start=None, end=None):
             # Make sure timesteps are all equal length before calculating
             # NB: this is made obsolete by using bentso's fullyear=True
             if checkEqual(timestep_list):
-<<<<<<< Updated upstream
-                if (isinstance(value, pd.DataFrame)) and (value.columns.str.contains('Hydro Pumped Storage').sum() == 1):
-                    # check if value is the production matrix and if so, if the country has pumped storage
-                    logging.info(f'Correcting for negative pumped hydropower in {key}')
-                    value = value.apply(distribute_neg_hydro, axis=1)  # correct for negative pumped hydro
-                summed_dict[key] = (value * timestep_list[0] / 1e6).sum() # To calculate electricity generated; take power per timestep and multiply by length of time period. Sum over whole year
-=======
                 if (isinstance(value, pd.DataFrame)):
                     # ENTSO-E data from 2020 introduces MultiIndex headers
                     if type(value.columns) == pd.MultiIndex:
@@ -87,7 +80,6 @@ def aggregate_entso(dictionary, start=None, end=None):
                     summed_dict[key] = (value * timestep_list[0] / 1e6).sum() # To calculate electricity generated; take power per timestep and multiply by length of time period. Sum over whole year
                 elif value.shape[0] - 1 == 0:
                     summed_dict[key] = (value / 1e6).sum()
->>>>>>> Stashed changes
                 new_dict[key] = value
             else:
                 print(f'warning: unequal time steps for {key}')
@@ -117,9 +109,6 @@ def build_trade_mat(trade_dict):
     trade_mat = trade_mat.unstack()
     trade_mat.columns = trade_mat.columns.get_level_values(1)  # remove extraneous level from column labels
     return trade_mat
-
-
- #%%
 <<<<<<< Updated upstream
 def clean_entso(start=None, end=None):
 =======
