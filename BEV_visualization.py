@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 # # Mapping of production and consumption mixes in Europe and their effect on carbon footprint of electric vehicles
@@ -50,6 +49,7 @@ from palettable.cubehelix import Cubehelix
 
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDrawingArea
 from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
+
 
 # %%
 fp = os.path.curdir
@@ -110,6 +110,69 @@ def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, pl
     plot_fig5(exp, fp_figure, results, export_figures, orientation='horizontal')
 
     plot_el_trade(exp, fp_figure, CFEL, export_figures)
+
+def country_footprint(experiment, params_country, timestamp, export_figures=True):
+    fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment)
+    country = params_country['country']
+    start = params_country['start']
+    # timestamp = params_country['start']
+    segment = params_country['segment']
+    plot_country_footprint(experiment, fp_figure, country, segment, start, timestamp, mapping_data, export_figures=True)
+
+def plot_country_footprint(exp, fp_figure, country, segment, start, timestamp, mapping_data, export_figures):
+    cmap = colors.ListedColormap(["#c6baca",  # light purple
+                                  "#83abce",
+                                  "#6eb668",
+                                  "#9caa41",
+                                  "#815137",
+                                  "#681e3e"  # red
+                                  ])
+
+    cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]  # retrieve colormap colors
+    cmap = cmap_col
+
+    col_list = ['BEV footprint - Segment A - Consumption mix', 'BEV footprint - Segment C - Consumption mix',
+                'BEV footprint - Segment D - Consumption mix', 'BEV footprint - Segment F - Consumption mix']
+
+    col = [col for col in col_list if 'Segment '+ segment in col]
+    country_ind = mapping_data.loc[mapping_data['ISO_A2'] == country]
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=600)
+    mapping_data.plot(ax=ax, color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
+    country_ind.plot(ax=ax, column=col, edgecolor='k', linewidth=0.3, alpha=0.8)
+
+    plt.xlim((-12, 34))
+    plt.ylim((32, 75))
+
+    plt.yticks([])
+    plt.xticks([])
+
+    # add annotations
+    timestamp = timestamp.strftime('%Y-%m-%d %H:%M %z')# np.datetime_as_string(timestamp, 'm', timezone='UTC')#strftime('%Y-$m-$d %H:$M %z')
+    caption = f'Carbon footprint for segment {segment} BEV in {country} \n at {timestamp} (g CO$_2$e /vkm) \n (User query for {start})'
+    ax.annotate(caption, xy=(0.5, 1.02), xycoords='axes fraction', fontsize=9, ha='center')
+
+    x = country_ind.geometry.centroid.x
+    y = country_ind.geometry.centroid.y
+
+    # ax.annotate(country_ind[col].values[0][0].round(0), xy=(x, y), xytext=(x, y), textcoords='data', color='w', ha='center', size=7)
+    annotate_map(ax,
+                country_ind[country_ind[col].notna()].index.to_list(),
+                country_ind,
+                country_ind[country_ind[col].notna()][col].values,
+                300,
+                threshold=0,
+                round_dig=0,
+                )
+
+    plt.show()
+
+    if export_figures:
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper), bbox_inches='tight')
+
+    plt.show()
 
 # %% Helper class for asymmetric normalizing colormaps
 
@@ -768,8 +831,74 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
 
     plt.show()
 
+<<<<<<< Updated upstream
 # %% Figure 3 - Absolute mitigation by electrification
 def plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries):
+=======
+
+#%%  Plot share of production emissions
+def plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries):
+    threshold = 0.75
+
+    col_list = ['Production as share of total footprint - Segment A - Consumption mix',
+                'Production as share of total footprint - Segment C - Consumption mix',
+                'Production as share of total footprint - Segment D - Consumption mix',
+                'Production as share of total footprint - Segment F - Consumption mix']
+
+    fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, squeeze=True,
+                             gridspec_kw={'wspace': 0.03, 'hspace': 0.03},
+                             figsize=(9.5, 8), dpi=600)
+
+    for col, ax in zip(col_list, axes.flatten()):
+        mapping_data[mapping_data[col].isna()].plot(ax=ax, color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
+        mapping_data[mapping_data[col].notna()].plot(ax=ax, column=col, cmap=cm.batlow_r, vmax=100, vmin=0, edgecolor='k', linewidth=0.3, alpha=0.8)
+
+        if ei_countries is not None:
+            mapping_data.loc[mapping_data['ISO_A2'].isin(ei_countries)].plot(ax=ax, column=col, facecolor='none', edgecolor='darkgrey', linewidth=0.3, hatch=5*'.', alpha=0.5, zorder=1)
+            mapping_data[mapping_data['ISO_A2'].isin(ei_countries)].plot(ax=ax, linewidth=0.3, facecolor='none', edgecolor='k', alpha=1)
+
+        annotate_map(ax,
+                     mapping_data[mapping_data[col].notna()].index.to_list(),
+                     mapping_data,
+                     mapping_data[mapping_data[col].notna()][col].values,
+                     100,
+                     threshold=threshold,
+                     round_dig=0,
+                     ei_countries=ei_countries
+                     )
+
+    plt.xlim((-12, 34))
+    plt.ylim((32, 75))
+
+    plt.yticks([])
+    plt.xticks([])
+
+    captions = ['(a) A-segment (mini)', '(b) C-segment (medium)',
+                '(c) D-segment (large)', '(d) F-segment (luxury)']
+
+    for i, a in enumerate(fig.axes):
+        a.annotate(captions[i], xy=(0.02, 0.92), xycoords='axes fraction', fontsize=12)
+
+
+    sns.reset_orig()
+    cb = plt.cm.ScalarMappable(cmap=cm.batlow_r, norm=colors.Normalize(0,100))
+    cb.set_array([])
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
+    cbar = fig.colorbar(cb, cax=cbar_ax, format=ticker.PercentFormatter())
+    cbar.set_alpha(0.7)
+    cbar.set_label('Production share of total lifecycle emissions, \n in %', rotation=90, labelpad=9, fontsize=12)
+    cbar.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+
+    if export_figures:
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig_3 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_3 ' + keeper), bbox_inches='tight')
+
+
+# %% Figure 4 - Absolute mitigation by electrification
+def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries):
+>>>>>>> Stashed changes
     # # Make multiple versions of Figure 3
     #
     # First, with A-segment ratios and the difference of A- and F-segments (delta)

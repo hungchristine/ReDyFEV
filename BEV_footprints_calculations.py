@@ -1,4 +1,3 @@
-
 # coding: utf-8
 
 """Mapping of production and consumption mixes in Europe and their effect on
@@ -33,12 +32,20 @@ import country_converter as coco
 import logging
 
 #%% Main function
+<<<<<<< Updated upstream
 def run_stuff(run_id, export_data=True, include_TD_losses=True, BEV_lifetime=180000, ICEV_lifetime=180000, leontief_el=True, production_el_intensity=679, incl_ei=False):
+=======
+def run_calcs(run_id, year, export_data=True, include_TD_losses=True, BEV_lifetime=180000, ICEV_lifetime=180000, leontief_el=True, production_el_intensity=679, incl_ei=False, energy_sens=False):
+>>>>>>> Stashed changes
      # Korean el-mix 679 g CO2/kWh, from ecoinvent
 
     fp = os.path.curdir
 
+<<<<<<< Updated upstream
     production, trades, trade_ef, country_total_prod_disagg, country_total_cons_disagg, g_raw, C = load_prep_el_data(fp)
+=======
+    production, trades, trade_ef, country_total_prod_disagg, country_total_cons_disagg, g_raw, C = load_prep_el_data(fp, year)
+>>>>>>> Stashed changes
     codecheck_file, elmixes, trade_only, country_el, CFEL, CFCI = el_calcs(leontief_el, run_id, fp, C, production, country_total_prod_disagg, country_total_cons_disagg, g_raw, trades, trade_ef, include_TD_losses, incl_ei, export_data)  # Leontief electricity calculations
     results_toSI, ICEV_total_impacts, ICEV_prodEOL_impacts, ICEV_op_int = BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, production_el_intensity, CFCI)
 
@@ -50,6 +57,7 @@ def run_stuff(run_id, export_data=True, include_TD_losses=True, BEV_lifetime=180
 
 #%% Load and format data for calculations
 
+<<<<<<< Updated upstream
 def load_prep_el_data(fp):
     fp_output = os.path.join(fp, 'output')
 
@@ -57,6 +65,15 @@ def load_prep_el_data(fp):
     filepath_production = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
     filepath_intensities = os.path.join(fp_output, 'final_emission_factors.csv')
     filepath_trades = os.path.join(fp_output, 'trades.csv')
+=======
+def load_prep_el_data(fp, year):
+    fp_output = os.path.join(fp, 'output')
+
+    # Output from bentso.py
+    filepath_production = os.path.join(fp_output, 'ENTSO_production_volumes_'+ str(year) +'.csv')
+    filepath_intensities = os.path.join(fp_output, 'final_emission_factors_'+ str(year) +'.csv')
+    filepath_trades = os.path.join(fp_output, 'trades_'+ str(year) +'.csv')
+>>>>>>> Stashed changes
     filepath_tradeonly_ef = os.path.join(fp_output, 'ecoinvent_ef_hv.csv')
 
     # read in production mixes (annual average)
@@ -369,6 +386,10 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
 
     BEV_prod_sharesp = BEV_prod_impacts.values / (BEV_impactsp.T)
     BEV_prod_sharesc = BEV_prod_impacts.values / (BEV_impactsc.T)
+<<<<<<< Updated upstream
+=======
+    BEV_prod_sharesc.columns = pd.MultiIndex.from_product([BEV_prod_sharesc.columns, ['Consumption mix']])
+>>>>>>> Stashed changes
     BEV_use_sharesp = (BEV_use['Production mix intensity'] * lifetime / 1e6) / (BEV_impactsp.T)
     BEV_use_sharesc = (BEV_use['Consumption mix intensity'] * lifetime / 1e6) / (BEV_impactsc.T)
 
@@ -466,8 +487,12 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     results = results.join(BEV_prod_EU)
     results = results.join(EU_BEVc)
     results = results.join(ratioc_EU_prod)
+<<<<<<< Updated upstream
 
     results.droplevel(0, axis=1)
+=======
+    results = results.join(pd.concat({"Production as share of total footprint":BEV_prod_sharesc}, axis=1))
+>>>>>>> Stashed changes
 
     results_toSI = results.copy()
 
@@ -501,9 +526,31 @@ def export_SI(run_id, results_toSI, production, trades, C, CFEL):
     # Export results for SI tables
     keeper = run_id + " {:%d-%m-%y, %H_%M}".format(datetime.now())
     fp_results = os.path.join(os.path.curdir, 'results')
+<<<<<<< Updated upstream
 
     results_file = os.path.join(fp_results, 'SI_results ' + keeper + '.xlsx')
     writer = pd.ExcelWriter(results_file)
+=======
+    excel_dict = {'Table S1 - El footprints': 'Data from Figure 1 in manuscript. Calculated national production and consumption mix hybridized lifecycle carbon intensities in g CO2-eq/kWh.',
+                  'Table S2 - intensity matrix':'Regionalized lifecycle carbon intensities of electricity generation technologies in g CO2-eq/kWh',
+                  'Table S3 - Production mix': ' Electricity generation mixes (2020), in TWh',
+                  'Table S4 - trades': 'Trades between studied countries (2020), in TWh/year.',
+                  'Table S5 - trade shares':'Total electricity traded relative to domestic production',
+                  'Table S6 - BEV fp':'Data from Figure 2 in manuscript. BEV carbon intensities in (g CO2-eq/km) for consumption electricity mix',
+                  'Table S7 - Abs BEV impacts':' Regionalized total lifecycle emissions from BEV in t CO2-eq, with 180 000 km lifetime, using consumption mixes',
+                  'Table S8 - Ratio':'Ratio of BEV:ICEV carbon footprints using consumption electricity mix',
+                  'Table S9 - EUR prod imp':'Production impacts of BEVs with domestic battery production using consumption electricity mix in t CO2-eq',
+                  'Table S10 - EUR prod fp':'Data from Figure 4 in manuscript. Lifecycle BEV footprint with domestic battery production using consumption electricity mix, in g CO2-eq/km',
+                  'Table S11 - Prod share of fp':'Contribution of vehicle production emissions to total carbon footprint'
+                  }
+
+    results_filepath = os.path.join(fp_results, 'SI_results ' + keeper + '.xlsx')
+    writer = pd.ExcelWriter(results_filepath)
+    pct_format = writer.book.add_format({'num_format': '#%'})
+    shade_cell = writer.book.add_format()
+    shade_cell.set_pattern(1)
+    shade_cell.set_bg_color('#C0C0C0')
+>>>>>>> Stashed changes
 
     results_toSI.drop(index=drop_countries, inplace=True) # remove ecoinvent-based countries
     table6 = results_toSI.loc(axis=1)['BEV footprint', :, 'Consumption mix'].round(0)
@@ -546,4 +593,3 @@ def pickle_results(run_id, results_toSI, CFEL, ICEV_total_impacts, codecheck_fil
             results_toSI.to_excel(writer, 'car footprints')
             writer.save()
     os.chdir(fp)
-

@@ -5,7 +5,7 @@
 """
 import pandas as pd
 import numpy as np
-from datetime import datetime, date, time, timezone
+from datetime import datetime, date, time, timezone, timedelta
 import pickle
 import os
 import logging
@@ -38,18 +38,23 @@ def aggregate_entso(dictionary, start=None, end=None):
     """
     new_dict = {}
     summed_dict = {}
+    no_trade = []
 
     for key, value in dictionary.items():
         timestep_list = []
         if start is not None and end is not None:
             try:
                 value = value.loc[start:end]
-                print(value)
+                # entsotime = value.index
             except AttributeError:
-                print('No dataframe, cannot take slice!')
+                if isinstance(key, tuple):
+                    no_trade.append(key)
+                else:
+                    print(f'No dataframe for {key}, cannot take slice!')
 
 #        try:
         if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
+            # we don't need timesteps if we have a single time period
             for i in range(0, value.shape[0]-1):
                 try:
                     timestep = (value.index[i+1] - value.index[i]).total_seconds() / 3600  # get timestep in hours
@@ -62,11 +67,27 @@ def aggregate_entso(dictionary, start=None, end=None):
             # Make sure timesteps are all equal length before calculating
             # NB: this is made obsolete by using bentso's fullyear=True
             if checkEqual(timestep_list):
+<<<<<<< Updated upstream
                 if (isinstance(value, pd.DataFrame)) and (value.columns.str.contains('Hydro Pumped Storage').sum() == 1):
                     # check if value is the production matrix and if so, if the country has pumped storage
                     logging.info(f'Correcting for negative pumped hydropower in {key}')
                     value = value.apply(distribute_neg_hydro, axis=1)  # correct for negative pumped hydro
                 summed_dict[key] = (value * timestep_list[0] / 1e6).sum() # To calculate electricity generated; take power per timestep and multiply by length of time period. Sum over whole year
+=======
+                if (isinstance(value, pd.DataFrame)):
+                    # ENTSO-E data from 2020 introduces MultiIndex headers
+                    if type(value.columns) == pd.MultiIndex:
+                        value = value.loc(axis=1)[:, 'Actual Aggregated']  # drop "Actual Consumption"
+                        value.columns = value.columns.droplevel(1)
+                    if (value.columns.str.contains('Hydro Pumped Storage').sum() == 1):
+                        # check if value is the production matrix and if so, if the country has pumped storage
+                        logging.info(f'Correcting for negative pumped hydropower in {key}')
+                        value = value.apply(distribute_neg_hydro, axis=1)  # correct for negative pumped hydro
+                if value.shape[0] -1 > 0:
+                    summed_dict[key] = (value * timestep_list[0] / 1e6).sum() # To calculate electricity generated; take power per timestep and multiply by length of time period. Sum over whole year
+                elif value.shape[0] - 1 == 0:
+                    summed_dict[key] = (value / 1e6).sum()
+>>>>>>> Stashed changes
                 new_dict[key] = value
             else:
                 print(f'warning: unequal time steps for {key}')
@@ -87,7 +108,7 @@ def aggregate_entso(dictionary, start=None, end=None):
 #        except Exception as e:
 #           print(f'something went wrong in {key}')
 #           print(e)
-    return summed_dict, new_dict
+    return summed_dict, new_dict #, entsotime
 
 
 def build_trade_mat(trade_dict):
@@ -99,7 +120,11 @@ def build_trade_mat(trade_dict):
 
 
  #%%
+<<<<<<< Updated upstream
 def clean_entso(start=None, end=None):
+=======
+def clean_entso(year=None, start=None, end=None, country=None):
+>>>>>>> Stashed changes
     fp = os.path.abspath(os.path.curdir)
     fp_output = os.path.join(os.path.curdir, 'output')
     os.chdir(fp_output)
@@ -115,8 +140,13 @@ def clean_entso(start=None, end=None):
 
 #    start = datetime(2019, 1, 1, 0)  # test values for sub-annual periods
 #    end = datetime(2019, 6, 30, 23)
+    if country is not None:
+        start = generation[country].iloc[generation[country].index.get_loc(start, method='nearest')].name
+        end = start + timedelta(minutes=1)
+        # summed_gen = generation[country].loc[entsotime]
+        # summed_trade = trade[country].loc[entsotime]
     summed_gen, new_gen = aggregate_entso(generation, start, end)
-    summed_trade, new_trade = aggregate_entso(trade, start, end)
+    summed_trade, new_trade  = aggregate_entso(trade, start, end)
 
     trade_df = build_trade_mat(summed_trade)
     gen_df = pd.DataFrame.from_dict(summed_gen, orient='index')
@@ -159,4 +189,8 @@ def clean_entso(start=None, end=None):
     logging.info('Completed export of ENTSO-E data')
     os.chdir(fp)
 
-    return add_countries
+    if country is not None:
+        entsotime = start  # report the ENTSO sampling period used
+        return add_countries, entsotime
+    else:
+        return add_countries
