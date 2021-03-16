@@ -9,11 +9,7 @@ import logging
 fp_results = os.path.join(os.path.curdir, 'results')
 fp_output = os.path.join(os.path.curdir, 'output')
 
-<<<<<<< Updated upstream
-def hybrid_emission_factors(trade_only):
-=======
 def hybrid_emission_factors(trade_only, year):
->>>>>>> Stashed changes
     # append pylcaio folder with hybridized LCI processes
     sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
     import pylcaio
@@ -255,11 +251,8 @@ def hybrid_emission_factors(trade_only, year):
     ef_countries = ef_countries.T
     ef_countries.sort_index(axis=0, inplace=True)
 
-<<<<<<< Updated upstream
-    entso_fp = os.path.join(fp_output, 'ENTSO_production_volumes.csv')
-=======
     entso_fp = os.path.join(fp_output, 'ENTSO_production_volumes_' + str(year) + '.csv')
->>>>>>> Stashed changes
+
     entso_e_production = pd.read_csv(entso_fp, header=0, index_col=[0])
     entso_e_production.replace(0, np.nan,inplace=True)
     entso_mask = entso_e_production.isna().sort_index()
@@ -352,31 +345,18 @@ def hybrid_emission_factors(trade_only, year):
 
     return ef_countries, no_ef
 
-<<<<<<< Updated upstream
-def clean_impact_factors(trade_only):
-    with open(os.path.join(fp_output, 'gen_final.pkl'), 'rb') as handle:
-            gen_df = pickle.load(handle)
-    gen_df.replace(0, np.nan, inplace=True)
-
-    with open(os.path.join(fp_output,'trade_final.pkl'), 'rb') as handle:
-=======
 def clean_impact_factors(year, trade_only):
     with open(os.path.join(fp_output, 'gen_final_' + str(year) + '.pkl'), 'rb') as handle:
             gen_df = pickle.load(handle)
     gen_df.replace(0, np.nan, inplace=True)
 
     with open(os.path.join(fp_output,'trade_final_' + str(year) + '.pkl'), 'rb') as handle:
->>>>>>> Stashed changes
         trade_df = pickle.load(handle)
 
     try:
         print('Calculating hybridized emission factors from pyLCAIO')
         # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
-<<<<<<< Updated upstream
-        ef, missing_factors = hybrid_emission_factors(trade_only)
-=======
         ef, missing_factors = hybrid_emission_factors(trade_only, year)
->>>>>>> Stashed changes
     except:
         print('Calculating from pyLCAIO failed. Importing previously calculated emission factors instead')
         # import ready-calculated emission factors if no access to pylcaio object
@@ -452,21 +432,11 @@ def clean_impact_factors(year, trade_only):
     # Export all data
     # .csv for use in BEV_footprints_calculations.py
 
-<<<<<<< Updated upstream
-    trade_df.to_csv(os.path.join(fp_output,'trades.csv'))
-    gen_df.to_csv(os.path.join(fp_output,'ENTSO_production_volumes.csv'))
-    ef.to_csv(os.path.join(fp_output,'final_emission_factors.csv'))
-
-
-    with pd.ExcelWriter(os.path.join(fp_results, 'entsoe_export_final.xlsx')) as writer:
-=======
     trade_df.to_csv(os.path.join(fp_output,'trades_' + str(year) + '.csv'))
     gen_df.to_csv(os.path.join(fp_output,'ENTSO_production_volumes_' + str(year) + '.csv'))
     ef.to_csv(os.path.join(fp_output,'final_emission_factors_' + str(year) + '.csv'))
 
-
     with pd.ExcelWriter(os.path.join(fp_results, 'entsoe_export_final_' + str(year) + '.xlsx')) as writer:
->>>>>>> Stashed changes
         trade_df.to_excel(writer, 'trade')
         gen_df.to_excel(writer, 'generation')
         ef.to_excel(writer,'new ef')
