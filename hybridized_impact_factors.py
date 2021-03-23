@@ -327,7 +327,7 @@ def hybrid_emission_factors(trade_only, year):
 
     fp_results = os.path.join(os.path.curdir,'results')
 
-    with pd.ExcelWriter(os.path.join(fp_results, 'hybrid_emission_factors_final.xlsx')) as writer:
+    with pd.ExcelWriter(os.path.join(fp_results, 'hybrid_emission_factors_final_' + str(year) + '.xlsx')) as writer:
         ef_countries.to_excel(writer, sheet_name='country_emission_factors')
         no_ef.to_excel(writer, sheet_name='missing_emission_factors')
         lv_mix_ef.to_excel(writer, sheet_name='ecoinvent ef')
@@ -347,7 +347,7 @@ def hybrid_emission_factors(trade_only, year):
 
 def clean_impact_factors(year, trade_only):
     with open(os.path.join(fp_output, 'gen_final_' + str(year) + '.pkl'), 'rb') as handle:
-            gen_df = pickle.load(handle)
+        gen_df = pickle.load(handle)
     gen_df.replace(0, np.nan, inplace=True)
 
     with open(os.path.join(fp_output,'trade_final_' + str(year) + '.pkl'), 'rb') as handle:
