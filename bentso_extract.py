@@ -62,7 +62,7 @@ def fetch_generation(year=2019, full_year=True):
             print(f'Warning: no data for generation in {country}!')
             logging.warning(f'No generation data for {country}')
             logging.warning(e)
-    with open(r'entso_export_gen.pkl', 'wb') as handle:
+    with open(r'entso_export_gen_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(gen_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
     return gen_dict
 
@@ -84,7 +84,7 @@ def fetch_trade(year=2019, full_year=True):
                 logging.warning(f'Warning: {imp_country}-{exp_country} trade relationship does not exist!')
                 trade_dict[(exp_country, imp_country)] = np.nan
                 no_trade_rel.append((exp_country, imp_country))
-    with open(r'entso_export_trade.pkl', 'wb') as handle:
+    with open(r'entso_export_trade_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(trade_dict, handle)
     return trade_dict
 
