@@ -19,7 +19,7 @@
 #      - country-specific indirect_ICEV_impacts.pkl (from BEV_footprints_calculation.py)
 #      - label_pos.csv
 #     - road_eqs_carage.xls
-# %%
+# %% Import packages
 
 import os
 import logging
@@ -45,25 +45,38 @@ from matplotlib.ticker import AutoMinorLocator, FixedLocator
 
 import geopandas as gpd
 import seaborn as sns
-from palettable.cubehelix import Cubehelix
+# from palettable.cubehelix import Cubehelix
+from cmcrameri import cm
+
 
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredDrawingArea
 from mpl_toolkits.axes_grid.anchored_artists import AnchoredText
 
 
-# %%
+# %%  Set up functions to run for visualizations for experiments
 fp = os.path.curdir
 fp_data = os.path.join(fp, 'data')
 fp_output = os.path.join(fp, 'output')
 fp_results = os.path.join(fp, 'results')
 
 def visualize(experiment, export_figures=True, include_TD_losses=True, plot_ei=False):
+    # this function used for fullyear and subannual period experiments
     fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment)
     plot_all(experiment, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, plot_ei, include_TD_losses=include_TD_losses, export_figures=export_figures)
 
 
-def setup(experiment):
+def country_footprint(experiment, params_country, timestamp, export_figures=True):
+    # this funcion used for country footprints experiments
+    # timestamp variable is closest ENTSO-E sample period to user query
+    fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment)
+    country = params_country['country']
+    start = params_country['start'] # user query for time period
+    segment = params_country['segment']
+    plot_country_footprint(experiment, fp_figure, country, segment, start, timestamp, mapping_data, export_figures=True)
 
+
+def setup(experiment):
+    # load required data
     fp_figure = os.path.join(fp_results, 'figures')
     fp_experiment = os.path.join(fp_figure, experiment)
 
@@ -91,12 +104,12 @@ def setup(experiment):
 
 
 def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, plot_ei=False, include_TD_losses=True, export_figures=False):
+    """ Reproduce figures from article """
     ei_countries = CFEL.loc[CFEL['Total production (TWh)'] == 0].index.tolist() # countries whose el mix were obtained from ecoinvent (and therefore have no production data)
     if plot_ei:
         ei_CFEL = CFEL.loc[ei_countries]
     else:
         mapping_data.loc[mapping_data['ISO_A2'].isin(ei_countries), 'Total production (TWh)':] = np.nan
-        results.drop(index=ei_countries, inplace=True)
         ei_CFEL = None
 
     CFEL.drop(index=ei_countries, inplace=True)  # drop ei-only countries regardless due to special treatment in Figure 1 (plotted separately)
@@ -104,75 +117,19 @@ def plot_all(exp, fp_figure, CFEL, results, ICEV_total_impacts, mapping_data, pl
     if not plot_ei:
         ei_countries = None
 
-    plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL)
-    plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries)
-    plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries)
-    plot_fig5(exp, fp_figure, results, export_figures, orientation='horizontal')
+    plot_fig2(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL)
+    plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries, 2)
+    plot_fig4(exp, fp_figure, mapping_data, export_figures, ei_countries, 2)
+    plot_fig5(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries, 2)
+    plot_fig7(exp, fp_figure, results, export_figures, orientation='horizontal')
 
-    plot_el_trade(exp, fp_figure, CFEL, export_figures)
+    # # maps with all segments for SI
+    # plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries, 4)
+    # plot_fig4(exp, fp_figure, mapping_data, export_figures, ei_countries, 4)
+    # plot_fig5(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries, 4)
 
-def country_footprint(experiment, params_country, timestamp, export_figures=True):
-    fp_figure, CFEL, results, ICEV_total_impacts, mapping_data = setup(experiment)
-    country = params_country['country']
-    start = params_country['start']
-    # timestamp = params_country['start']
-    segment = params_country['segment']
-    plot_country_footprint(experiment, fp_figure, country, segment, start, timestamp, mapping_data, export_figures=True)
+    plot_el_trade(exp, fp_figure, CFEL, export_figures)  # figure S1 in supplementary information
 
-def plot_country_footprint(exp, fp_figure, country, segment, start, timestamp, mapping_data, export_figures):
-    cmap = colors.ListedColormap(["#c6baca",  # light purple
-                                  "#83abce",
-                                  "#6eb668",
-                                  "#9caa41",
-                                  "#815137",
-                                  "#681e3e"  # red
-                                  ])
-
-    cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]  # retrieve colormap colors
-    cmap = cmap_col
-
-    col_list = ['BEV footprint - Segment A - Consumption mix', 'BEV footprint - Segment C - Consumption mix',
-                'BEV footprint - Segment D - Consumption mix', 'BEV footprint - Segment F - Consumption mix']
-
-    col = [col for col in col_list if 'Segment '+ segment in col]
-    country_ind = mapping_data.loc[mapping_data['ISO_A2'] == country]
-
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=600)
-    mapping_data.plot(ax=ax, color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
-    country_ind.plot(ax=ax, column=col, edgecolor='k', linewidth=0.3, alpha=0.8)
-
-    plt.xlim((-12, 34))
-    plt.ylim((32, 75))
-
-    plt.yticks([])
-    plt.xticks([])
-
-    # add annotations
-    timestamp = timestamp.strftime('%Y-%m-%d %H:%M %z')# np.datetime_as_string(timestamp, 'm', timezone='UTC')#strftime('%Y-$m-$d %H:$M %z')
-    caption = f'Carbon footprint for segment {segment} BEV in {country} \n at {timestamp} (g CO$_2$e /vkm) \n (User query for {start})'
-    ax.annotate(caption, xy=(0.5, 1.02), xycoords='axes fraction', fontsize=9, ha='center')
-
-    x = country_ind.geometry.centroid.x
-    y = country_ind.geometry.centroid.y
-
-    # ax.annotate(country_ind[col].values[0][0].round(0), xy=(x, y), xytext=(x, y), textcoords='data', color='w', ha='center', size=7)
-    annotate_map(ax,
-                country_ind[country_ind[col].notna()].index.to_list(),
-                country_ind,
-                country_ind[country_ind[col].notna()][col].values,
-                300,
-                threshold=0,
-                round_dig=0,
-                )
-
-    plt.show()
-
-    if export_figures:
-        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper), bbox_inches='tight')
-
-    plt.show()
 
 # %% Helper class for asymmetric normalizing colormaps
 
@@ -225,15 +182,16 @@ def cmap_map(function, cmap):
 
     return colors.LinearSegmentedColormap('colormap',cdict,1024)
 
-# %% Plot Figure 1
+# %% Plot Figure 2 - Production vs Consumption electricity
 
-def plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL=None):
-    # Prepare variables for Figure 1
+def plot_fig2(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL=None):
+    """ Set up different options for production vs consumption electricity figure"""
+    # Prepare variables for Figure 2
     CFEL_sorted = CFEL.sort_values(by='Production mix intensity')
 
     # determine net importers and exporters for using colormap; positive if net importer, negative if net exporter
     net_trade = (CFEL_sorted.iloc[:, 1] - CFEL_sorted.iloc[:, 0])
-    pct_trade = CFEL_sorted['trade percentage']
+    pct_trade = CFEL_sorted['Trade percentage']*100
 
     # for plotting with transmission losses
     net_trade_TL = (CFEL_sorted.iloc[:, 1] - CFEL_sorted.iloc[:, 0]).values
@@ -241,10 +199,9 @@ def plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL=N
     print("number of importers: " + str(sum(net_trade > 0)))
     print("number of exporters: " + str(sum(net_trade < 0)))
 
-
-    # Finally, plot Figure 1
-    cmap = Cubehelix.make(min_light=0, max_light=0.75, gamma=0.8, start=0, rotation=1.4, reverse=True, n=256)
-    mark_color = cmap.mpl_colormap
+    # Finally, plot Figure 2
+    cmap = cm.oslo_r
+    mark_color = cmap
     sns.set_style('whitegrid')
 
     # Prep country marker sizes; for now, use same size for all axis types
@@ -261,16 +218,21 @@ def plot_fig1(exp, fp_figure, CFEL, include_TD_losses, export_figures, ei_CFEL=N
     else:
         plot_lim = 1300
 
-    fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_lim, export_figures,
+    fig2_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_lim, export_figures,
                    'linear', size_ind, marker_size, mark_color, pct_trade, xlim=500, ylim=500)
 
-# %% Figure 1 generator (carbon footprint of electricity production mix vs consumption mix)
+# %% Figure 2 generator (carbon footprint of electricity production mix vs consumption mix)
 
 
-def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_figures, axis_type, size_ind, marker_size, marker_clr, net_trade=None, xlim=None, ylim=None):
-    """ Generates figure for Figure 1; carbon footprint of production vs consumption
+def fig2_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_figures, axis_type, size_ind, marker_size, marker_clr, net_trade=None, xlim=None, ylim=None):
+    """ Generate Figure 2; carbon footprint of production vs consumption
     mixes. Can be plotted on linear, log or semilog axes
     """
+
+    # Sort by marker size to have smallest markers drawn last
+    marker_size = marker_size.sort_values(ascending=False)
+    CFEL_markers = CFEL_sorted.copy()
+    CFEL_markers = CFEL_markers.reindex(marker_size.index)
     fig, ax = plt.subplots(1, figsize=(16, 12))
 
     # Control for input axis types linear, semilog, logs
@@ -280,20 +242,18 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
         axis_type = "log"
     ax.set_xscale(axis_type)
 
-    ### Finally, plot data
-    """norm = MidpointNormalize(midpoint=0, vmax=net_trade.max(), vmin=net_trade.min())
-    plot = ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                      s=marker_size, alpha=0.5, norm=norm, c=net_trade, cmap=marker_clr, label='_nolegend_')"""
+    # Plot data
     norm = colors.Normalize(vmax=100)
-    plot = ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
+    plot = ax.scatter(CFEL_markers.iloc[:, 2], CFEL_markers.iloc[:, 3],
                       s=marker_size, alpha=0.5, norm=norm, c=net_trade, cmap=marker_clr, label='_nolegend_')
-    ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
+
+    ax.scatter(CFEL_markers.iloc[:, 2], CFEL_markers.iloc[:, 3],
                s=2, c='k', alpha=0.9, edgecolor='k', label='_nolegend_')  # Include midpoint in figure
     if ei_CFEL is not None:
         ax.scatter(ei_CFEL.iloc[:, 2], ei_CFEL.iloc[:, 3], s=100, marker='*', label='_nolegend_')
 
     # Hack to have darker marker edges
-    ax.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
+    ax.scatter(CFEL_markers.iloc[:, 2], CFEL_markers.iloc[:, 3],
                s=marker_size, alpha=0.7, norm=norm, c="None", edgecolor='k', linewidths=0.7,
                label='_nolegend_')
 
@@ -323,7 +283,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
                                     bbox_transform=ax.transAxes,
                                     prop=dict(size=17, weight='medium'))
 
-    add_year = AnchoredText('2019', frameon=False, loc=9, bbox_to_anchor=(0.185, 0.961),
+    add_year = AnchoredText('2020', frameon=False, loc=9, bbox_to_anchor=(0.185, 0.961),
                             bbox_transform=ax.transAxes, prop=dict(size=17, weight='medium'))
 
     # The below is for having the legend in the bottom right position
@@ -337,7 +297,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     for i, area in enumerate(legend_sizes):
         radius_pts = np.sqrt(area / 3.14)
         c1 = Circle((150, np.sqrt(area / 3.14) + 10), radius_pts,
-                    fc = '#89BEA3',
+                    fc = marker_clr(0.5), #'#89BEA3',
                     ec='k', lw=0.6, alpha=0.4)
         c2 = Circle((150, np.sqrt(area / 3.14) + 10), radius_pts,
                     fc="None", ec='k', lw=0.7, alpha=0.7)
@@ -357,63 +317,64 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     ax.plot([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1]], color="grey", alpha=0.6)
     # 10%
     plt.fill_between([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1] * 1.1],
-                     [0, ax.get_xlim()[1] * 0.9], color="grey", alpha=0.13, zorder=0)
+                     [0, ax.get_xlim()[1] * 0.9], color="grey", edgecolor='k', alpha=0.13, zorder=10)
     # 20%
     plt.fill_between([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1] * 1.2],
-                     [0, ax.get_xlim()[1] * 0.8], color="grey", alpha=0.1, zorder=0)
+                     [0, ax.get_xlim()[1] * 0.8], color="grey",edgecolor='k', alpha=0.1, zorder=9)
+    # 50%
     plt.fill_between([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1] * 1.5],
-                     [0, ax.get_xlim()[1] * 0.5], color='grey', alpha=0.07, zorder=0)
-    ax.annotate(r'$\pm$ 10%', xy=(0, 0), xytext=(0.881, 0.987), xycoords='axes fraction', fontsize=13, rotation=40)
-    ax.annotate(r'$\pm$ 20%', xy=(0, 0), xytext=(0.808, 0.987), xycoords='axes fraction', fontsize=13, rotation=40)
-    ax.annotate(r'$\pm$ 50%', xy=(0, 0), xytext=(0.64, 0.987), xycoords='axes fraction', fontsize=13, rotation=40)
-    ax.annotate(r'x = y', xy=(0, 0), xytext=(0.955, 0.987), xycoords='axes fraction', fontsize=13, rotation=40)
+                     [0, ax.get_xlim()[1] * 0.5], color='grey', edgecolor='k', alpha=0.07, zorder=8)
+    ax.annotate(r'$\pm$ 10%', xy=(0, 0), xytext=(0.881, 0.95), xycoords='axes fraction', fontsize=13, rotation=40)
+    ax.annotate(r'$\pm$ 20%', xy=(0, 0), xytext=(0.808, 0.95), xycoords='axes fraction', fontsize=13, rotation=40)
+    ax.annotate(r'$\pm$ 50%', xy=(0, 0), xytext=(0.64, 0.95), xycoords='axes fraction', fontsize=13, rotation=40)
+    ax.annotate(r'x = y', xy=(0, 0), xytext=(0.95, 0.96), xycoords='axes fraction', fontsize=13, rotation=40)
 
     ax.set_xlabel("Carbon footprint of production mix \n (g CO$_2$ kWh$^{-1}$)", fontsize=20, labelpad=14)
     ax.set_ylabel("Carbon footprint of consumption mix \n (g CO$_2$ kWh$^{-1}$)", fontsize=20, labelpad=14)
 
     ### Make and format inset figure
-    ax2 = fig.add_subplot(339)  # for inlay in bottom right position inset subplot
-    ax2.axis([400, xlim, 400, ylim])
+    # ax2 = fig.add_subplot(339)  # for inlay in bottom right position inset subplot
+    # ax2.axis([400, xlim, 400, ylim])
 
     # Set formatting for zoomed inlay figure
 
     # markersize = 40, s = 40*2, pi/4*s = marker area
     # Linear factor between main fig and inset: x1/x2 = z*(l1/l2) --> 1100/150 = 33.75/10.85*x --> x=2.357
-    marker_size_ratio = (ax.get_xlim()[1] / (ax2.get_xlim()[1] - ax2.get_xlim()[0]))
+    # marker_size_ratio = (ax.get_xlim()[1] / (ax2.get_xlim()[1] - ax2.get_xlim()[0]))
 
-    ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                s= (np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.5,
-                norm=norm, c=net_trade, cmap=marker_clr, edgecolor='k', label='_nolegend_')
-    ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                s=(np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.9,
-                norm=norm, c="None", edgecolor='k', linewidths=0.7, label='_nolegend_')  # Hack for darker edge colours
-    ax2.scatter(CFEL_sorted.iloc[:, 2], CFEL_sorted.iloc[:, 3],
-                s=2, c='k', alpha=0.9, edgecolor='k', label='_nolegend_')  # Include midpoint in figure
+    # ax2.scatter(CFEL_markers.iloc[:, 2], CFEL_markers.iloc[:, 3],
+    #             s= (np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.5,
+    #             norm=norm, c=net_trade, cmap=marker_clr, edgecolor='k', label='_nolegend_')
+    # ax2.scatter(CFEL_markers.iloc[:, 2], CFEL_markers.iloc[:, 3],
+    #             s=(np.sqrt(marker_size) * np.sqrt(marker_size_ratio))**2, alpha=0.9,
+    #             norm=norm, c="None", edgecolor='k', linewidths=0.7, label='_nolegend_')  # Hack for darker edge colours
+    # ax2.scatter(CFEL_markers.iloc[:, 2], CFEL_markers.iloc[:, 3],
+    #             s=2, c='k', alpha=0.9, edgecolor='k', label='_nolegend_')  # Include midpoint in figure
 
-    ax2.xaxis.tick_top()
-    ax2.yaxis.tick_right()
-    ax2.xaxis.set_major_locator(ticker.MultipleLocator(50))
-    ax2.yaxis.set_major_locator(ticker.MultipleLocator(50))
-    ax2.tick_params(which="major", labelsize=12)
-    ax2.plot([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1]], color="grey", alpha=0.6)
-    plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.1],
-                     [0, ax2.get_xlim()[1] * 0.9], color="grey", alpha=0.13)
-    plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.2],
-                     [0, ax2.get_xlim()[1] * 0.8], color="grey", alpha=0.1)
-    plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.5],
-                     [0, ax2.get_xlim()[1] * 0.5], color='grey', alpha=0.07)
+    # ax2.xaxis.tick_top()
+    # ax2.yaxis.tick_right()
+    # ax2.xaxis.set_major_locator(ticker.MultipleLocator(50))
+    # ax2.yaxis.set_major_locator(ticker.MultipleLocator(50))
+    # ax2.tick_params(which="major", labelsize=12)
+    # ax2.plot([0, ax.get_xlim()[1]], [0, ax.get_xlim()[1]], color="grey", alpha=0.6)
+    # plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.1],
+    #                  [0, ax2.get_xlim()[1] * 0.9], color="grey", alpha=0.13)
+    # plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.2],
+    #                  [0, ax2.get_xlim()[1] * 0.8], color="grey", alpha=0.1)
+    # plt.fill_between([0, ax2.get_xlim()[1]], [0, ax2.get_xlim()[1] * 1.5],
+    #                  [0, ax2.get_xlim()[1] * 0.5], color='grey', alpha=0.07)
 
     ### Add country text labels
-    for (country, country_data) in CFEL_sorted.iterrows():
+    for (country, country_data) in CFEL_markers.iterrows():
         # Inset figure labelling
-        if country_data["Production mix intensity"] >= (ax2.get_xlim()[0 ] * 0.9) and country_data["Production mix intensity"] <= (ax2.get_xlim()[1]*1.1) and country_data["Consumption mix intensity"] >= (ax2.get_ylim()[0]*0.9) and country_data["Consumption mix intensity"] <= (ax2.get_ylim()[1]*1.1): #Inset labels
-            if country in ['DE', 'IT', 'NL']:
-                pass  # ignore the largest circles in the inset, as they don't need labelling
-            else:
-                ax2.annotate(country, xy=(country_data["Production mix intensity"], country_data["Consumption mix intensity"]),
-                             xytext=(np.sqrt(marker_size[country]*marker_size_ratio*(np.pi/4))/2+6,-7),
-                             textcoords=("offset points"), size=15,
-                             path_effects=[pe.withStroke(linewidth=4, foreground="w", alpha=0.8)])
+        # if country_data["Production mix intensity"] >= (ax2.get_xlim()[0 ] * 0.9) and country_data["Production mix intensity"] <= (ax2.get_xlim()[1]*1.1) and country_data["Consumption mix intensity"] >= (ax2.get_ylim()[0]*0.9) and country_data["Consumption mix intensity"] <= (ax2.get_ylim()[1]*1.1): #Inset labels
+        #     if country in ['DE', 'IT', 'NL']:
+        #         pass  # ignore the largest circles in the inset, as they don't need labelling
+        #     else:
+        #         ax2.annotate(country, xy=(country_data["Production mix intensity"], country_data["Consumption mix intensity"]),
+        #                      xytext=(np.sqrt(marker_size[country]*marker_size_ratio*(np.pi/4))/2+6,-7),
+        #                      textcoords=("offset points"), size=15,
+        #                      path_effects=[pe.withStroke(linewidth=4, foreground="w", alpha=0.8)])
 
         # Left corner of main figure
         if country_data["Production mix intensity"] <= 100 and country_data["Consumption mix intensity"] <= 100:
@@ -460,7 +421,7 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
     cbar_max = 100
     # Begin plotting colorbar
     cbar = plt.colorbar(plot, cax=ax_cbar, drawedges=False, extend='max')#, use_gridspec=True)
-    cbar.set_label('Electricity traded, as % of net production', fontsize=18, rotation=90, labelpad=8)
+    cbar.set_label('Gross electricity traded, as % of net production', fontsize=18, rotation=90, labelpad=8)
 
     cbar.set_alpha(1)
     cbar.ax.tick_params(labelsize=14)
@@ -474,19 +435,20 @@ def fig1_generator(exp, fp_figure, CFEL_sorted, ei_CFEL, plot_maxlim, export_fig
 
     if export_figures:
         keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig_1 - ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig_1 - ' + keeper + '.png'), bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_2 - ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_2 - ' + keeper + '.png'), bbox_inches='tight')
 
     plt.show()
 
 
-# %% Figure 5 (differences for domestic production)
-def plot_fig5(exp, fp_figure, results, export_figures, orientation='both'):
+# %% Figure 7 (differences for domestic production)
+def plot_fig7(exp, fp_figure, results, export_figures, orientation='both'):
     sns.set_style('whitegrid')
     A_diff = (results['BEV footprint, EUR production - Segment A - Consumption mix'] -
               results['BEV footprint - Segment A - Consumption mix']) / results['BEV footprint - Segment A - Consumption mix']
     F_diff = (results['BEV footprint, EUR production - Segment F - Consumption mix'] -
               results['BEV footprint - Segment F - Consumption mix']) / results['BEV footprint - Segment F - Consumption mix']
+
     fig_data = pd.DataFrame([A_diff, F_diff], index=['A segment', 'F segment'])
     fig_data = fig_data.T
 
@@ -510,8 +472,8 @@ def plot_fig5(exp, fp_figure, results, export_figures, orientation='both'):
 
         if export_figures:
             keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-            plt.savefig(os.path.join(fp_figure, 'Fig_5_horizontal ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-            plt.savefig(os.path.join(fp_figure, 'Fig_5_horizontal ' + keeper + '.png'), bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig_7_horizontal ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig_7_horizontal ' + keeper + '.png'), bbox_inches='tight')
 
         plt.show()
 
@@ -524,11 +486,10 @@ def plot_fig5(exp, fp_figure, results, export_figures, orientation='both'):
         ax.legend(facecolor='white', edgecolor='k', fontsize='large', framealpha=1, frameon=True)
         ax.set_ylabel('Difference in BEV carbon intensity by shifting to domestic battery production', labelpad=12)
 
-
         if export_figures:
             keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-            plt.savefig(os.path.join(fp_figure, 'Fig_5_vertical ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-            plt.savefig(os.path.join(fp_figure, 'Fig_5_vertical ' + keeper), bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig_7_vertical ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+            plt.savefig(os.path.join(fp_figure, 'Fig_7_vertical ' + keeper), bbox_inches='tight')
     if orientation not in ('horizontal', 'vertical', 'both'):
         raise Exception('Invalid orientation for Figure 4')
 
@@ -733,24 +694,21 @@ def annotate_map(ax, countries, mapping_data, values, cmap_range, threshold=0.8,
         else:
             print(f'{mapping_data.loc[loc]["ISO_A2"]} has no label coordinates')
 
-# %% Figure 2 - BEV footprints by country
+# %% Figure 3 - BEV footprints by country
 
-
-def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
-    sns.set_style('dark')
+def plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries, num_panels):
+    # min/max extremes for colorbar
     vmin = 50
     vmax = 375
-    threshold = 0 # threshold for switching annotation colours
+    mpl.rcParams['hatch.linewidth'] = 0.2  # for plotting ei_countries (optional)
 
-    mpl.rcParams['hatch.linewidth'] = 0.2
-
-    cmap = colors.ListedColormap(['#4e7496',  # blue
-                                  '#438e83',
-                                  '#3F8638',
-                                  '#737D2F',
-                                  '#734126',
-                                  '#681E3E'  # red
-                                 ])
+    cmap = colors.ListedColormap(["#c6baca",  # light purple
+                                  "#83abce",
+                                  "#6eb668",
+                                  "#9caa41",
+                                  "#815137",
+                                  "#681e3e"  # red
+                                  ])
 
     cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]  # retrieve colormap colors
     cmap = cmap_col
@@ -758,23 +716,37 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
     # Make manual boundaries for cmap
     # range of negative values approximately 1/3 of that of positive values;
     # cut-off colormap for visual 'equality'
-
     boundaries = [i for i in np.arange(vmin, vmax, 50)]  # define boundaries of colormap transitions
+    threshold = boundaries[-2] / boundaries[-1]  # threshold for switching annotation colours
     cmap_BEV, norm = colors.from_levels_and_colors(boundaries, colors=[cmap[0]]+ cmap + [cmap_col[-1]], extend='both')
 
-    max_fp = max(mapping_data['BEV footprint - Segment A - Production mix'].max(),
-                 mapping_data['BEV footprint - Segment A - Consumption mix'].max(),
-                 mapping_data['BEV footprint - Segment F - Production mix'].max(),
+    max_fp = max(mapping_data['BEV footprint - Segment A - Consumption mix'].max(),
                  mapping_data['BEV footprint - Segment F - Consumption mix'].max())
 
-    fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, squeeze=True,
+    col_list = ['BEV footprint - Segment A - Consumption mix',
+                'BEV footprint - Segment C - Consumption mix',
+                'BEV footprint - Segment D - Consumption mix',
+                'BEV footprint - Segment F - Consumption mix']
+
+    captions = ['(a) A-segment (mini)',
+                '(b) C-segment (medium)',
+                '(c) D-segment (large)',
+                '(b) F-segment (luxury)']
+
+    if num_panels == 2:
+        nrows = 1
+        col_list = [col_list[0]] + [col_list[-1]]
+        captions = [captions[0]] + [captions[-1]]
+        figsize= (9.5, 5)
+    elif num_panels == 4:
+        nrows = 2
+        figsize= (9.5, 8)
+
+    fig, axes = plt.subplots(nrows=nrows, ncols=2, sharex=True, sharey=True, squeeze=True,
                              gridspec_kw={'wspace': 0.03, 'hspace': 0.03},
-                             figsize=(9.5, 8), dpi=600)
+                             figsize=figsize, dpi=600)
 
     # Plot maps
-    col_list = ['BEV footprint - Segment A - Production mix', 'BEV footprint - Segment F - Production mix',
-                'BEV footprint - Segment A - Consumption mix', 'BEV footprint - Segment F - Consumption mix']
-
     for col, ax in zip(col_list, axes.flatten()):
         mapping_data[mapping_data[col].isna()].plot(ax=ax, color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
         mapping_data[mapping_data[col].notna()].plot(ax=ax, column=col, cmap=cmap_BEV, vmax=vmax, vmin=vmin, norm=norm, edgecolor='k', linewidth=0.3, alpha=0.8)
@@ -797,11 +769,8 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
     plt.ylim((32, 75))
 
     # Label axes
-    axes[0, 0].set_ylabel('Production mix', fontsize=13.5)
-    axes[1, 0].set_ylabel('Consumption mix', fontsize=13.5)
-    axes[0, 0].set_title('A-segment (mini)', fontsize=13.5)
-    axes[0, 1].set_title('F-segment (luxury)', fontsize=13.5)
-
+    for i, a in enumerate(fig.axes):
+        a.annotate(captions[i], xy=(0.02, 0.92), xycoords='axes fraction', fontsize=12)
 
     plt.yticks([])
     plt.xticks([])
@@ -809,11 +778,26 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
     sns.reset_orig()
     cb = plt.cm.ScalarMappable(cmap=cmap_BEV, norm=norm)
     cb.set_array([])
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
-    cbar = fig.colorbar(cb, cax=cbar_ax, extend='both')
+
+    if num_panels == 2:
+        # horizontal colorbar (1x2 figure)
+        orientation = 'horizontal'
+        fig.subplots_adjust(bottom=0.2)
+        cbar_ax = fig.add_axes([0.13, 0.13, 0.76, 0.035])
+        rotation = 0
+        keeper = 'Fig_3_2p ' + exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+    elif num_panels == 4:
+        # for vertical colorbar (2x2 figure)
+        orientation = 'vertical'
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
+        rotation = 90
+        keeper = 'Fig_3_4p ' + exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+
+
+    cbar = fig.colorbar(cb, cax=cbar_ax, extend='both', orientation=orientation)
     cbar.set_alpha(0.7)
-    cbar.set_label('Lifecycle BEV carbon intensity, \n g CO$_2$ eq/km', rotation=90, labelpad=9, fontsize=12)
+    cbar.set_label('Lifecycle BEV carbon intensity, \n g CO$_2$ eq/km', labelpad=9, fontsize=12, rotation=rotation)
     cbar.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     # hack to remove minor ticks on colorbar extending past min/max values (bug in matplotlib?)
@@ -823,31 +807,42 @@ def plot_fig2(exp, fp_figure, mapping_data, export_figures, ei_countries):
 
     cbar.ax.tick_params(labelsize=9, pad=4)
 
-
     if export_figures:
-        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig_2 ' + keeper), bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, keeper), bbox_inches='tight')
 
     plt.show()
 
-<<<<<<< Updated upstream
-# %% Figure 3 - Absolute mitigation by electrification
-def plot_fig3(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries):
-=======
-
-#%%  Plot share of production emissions
-def plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries):
-    threshold = 0.75
+#%%  Figure 4 - Plot share of production emissions
+def plot_fig4(exp, fp_figure, mapping_data, export_figures, ei_countries, num_panels):
+    threshold = 0.75  # set up threshold for changing the annotation colour
 
     col_list = ['Production as share of total footprint - Segment A - Consumption mix',
                 'Production as share of total footprint - Segment C - Consumption mix',
                 'Production as share of total footprint - Segment D - Consumption mix',
                 'Production as share of total footprint - Segment F - Consumption mix']
 
-    fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, squeeze=True,
+    captions = ['(a) A-segment (mini)',
+                '(b) C-segment (medium)',
+                '(c) D-segment (large)',
+                '(b) F-segment (luxury)']
+
+    if num_panels == 2:
+        # if only 2 panels are presented, present segments A and F
+        nrows = 1
+        col_list = [col_list[0]] + [col_list[-1]]
+        captions = [captions[0]] + [captions[-1]]
+        figsize= (9.5, 5)
+    elif num_panels == 4:
+        # present all segments
+        nrows = 2
+        figsize= (9.5, 8)
+        orientation = 'vertical'
+
+    fig, axes = plt.subplots(nrows=nrows, ncols=2, sharex=True, sharey=True, squeeze=True,
                              gridspec_kw={'wspace': 0.03, 'hspace': 0.03},
-                             figsize=(9.5, 8), dpi=600)
+                             figsize=figsize, dpi=600)  # for 2x2 figure: figsize=(9.5, 8)
+
 
     for col, ax in zip(col_list, axes.flatten()):
         mapping_data[mapping_data[col].isna()].plot(ax=ax, color='lightgrey', edgecolor='darkgrey', linewidth=0.3)
@@ -873,41 +868,47 @@ def plot_fig3(exp, fp_figure, mapping_data, export_figures, ei_countries):
     plt.yticks([])
     plt.xticks([])
 
-    captions = ['(a) A-segment (mini)', '(b) C-segment (medium)',
-                '(c) D-segment (large)', '(d) F-segment (luxury)']
-
     for i, a in enumerate(fig.axes):
         a.annotate(captions[i], xy=(0.02, 0.92), xycoords='axes fraction', fontsize=12)
-
 
     sns.reset_orig()
     cb = plt.cm.ScalarMappable(cmap=cm.batlow_r, norm=colors.Normalize(0,100))
     cb.set_array([])
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
-    cbar = fig.colorbar(cb, cax=cbar_ax, format=ticker.PercentFormatter())
+
+    if num_panels == 2:
+        # horizontal colorbar (1x2 figure)
+        orientation = 'horizontal'
+        fig.subplots_adjust(bottom=0.2)
+        cbar_ax = fig.add_axes([0.13, 0.13, 0.76, 0.035])
+        rotation = 0
+        keeper = 'Fig_4_2p ' + exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+    elif num_panels == 4:
+        # for vertical colorbar (2x2 figure)
+        orientation = 'vertical'
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
+        rotation = 90
+        keeper = 'Fig_4_4p ' + exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+
+    cbar = fig.colorbar(cb, cax=cbar_ax, format=ticker.PercentFormatter(), orientation=orientation)
     cbar.set_alpha(0.7)
-    cbar.set_label('Production share of total lifecycle emissions, \n in %', rotation=90, labelpad=9, fontsize=12)
+    cbar.set_label('Production share of total lifecycle emissions, \n in %', labelpad=9, fontsize=12, rotation=rotation)
     cbar.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
 
     if export_figures:
-        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig_3 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig_3 ' + keeper), bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, keeper), bbox_inches='tight')
 
 
-# %% Figure 4 - Absolute mitigation by electrification
-def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries):
->>>>>>> Stashed changes
+# %% Figure 5 - Absolute mitigation by electrification
+def plot_fig5(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, ei_countries, num_panels):
     # # Make multiple versions of Figure 3
     #
     # First, with A-segment ratios and the difference of A- and F-segments (delta)
     # Second, with A-segment and F-segment ratios (original Figure 3) + separate delta figure
     # Third, with absolute difference between BEV and ICEV for both panels
 
-    sns.set_style('dark')
-    threshold=0.8
-
+    # Calculate values and set up "shortcut"
     mapping_data['abs_diff_A'] = ICEV_total_impacts['A'].reindex_like(mapping_data, method='pad').subtract(mapping_data['BEV impacts - Segment A - Consumption mix'])
     mapping_data['abs_diff_C'] = ICEV_total_impacts['C'].reindex_like(mapping_data, method='pad').subtract(mapping_data['BEV impacts - Segment C - Consumption mix'])
     mapping_data['abs_diff_D'] = ICEV_total_impacts['D'].reindex_like(mapping_data, method='pad').subtract(mapping_data['BEV impacts - Segment D - Consumption mix'])
@@ -917,6 +918,7 @@ def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
     abs_diff.set_index('ADM0_A3', inplace=True)
     abs_diff = abs_diff.iloc[:, -4:]
 
+    # Calculate extreme values for colourmap normalization
     rmax = max(mapping_data['abs_diff_A'].max(),
                mapping_data['abs_diff_C'].max(),
                mapping_data['abs_diff_D'].max(),
@@ -929,7 +931,13 @@ def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
 
     N = 7  # Number of sections from full colormap; must be odd number for proper normalization
     if N==7:
-        cmap_diff = colors.ListedColormap(['#6a0000', '#b94d30', '#f0a079', '#ffffe0', '#99bb8a', '#47793d', '#003900'])
+        cmap_diff = colors.ListedColormap(['#6a0000',
+                                           '#b94d30',
+                                           '#f0a079',
+                                           '#ffffe0',
+                                           '#99bb8a',
+                                           '#47793d',
+                                           '#003900'])
     else:
         cmap_diff = plt.get_cmap(cmap_map(lambda x: x*0.75, cm.RdYlGn), N) #plt.get_cmap('RdYlGn', N)
 
@@ -938,7 +946,7 @@ def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
 
     # Make manual boundaries for cmap
     # range of negative values approximately 1/3 of that of positive values;
-    # cut-off colormap for visual 'equality'
+    # cut-off colormap asymmetrically for visual 'equality'
     cutoff = int(int(N/2) - ((np.abs(rmin) - 0) / (rmax - 0)) * int(N/2))
     cmap = cmap_col[2:]  # "trim" bottom section of colormap colors
     upper_bound = [i for i in np.linspace(2.5, int(rmax), 4)]
@@ -946,13 +954,29 @@ def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
 
     cmap_colors, norm = colors.from_levels_and_colors(boundaries, colors=[cmap[0]] + cmap + [cmap[-1]], extend='both')
 
-    fig, axes = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True, squeeze=True,
-                           gridspec_kw={'wspace': 0.03, 'hspace': 0.03}, figsize=(9.5, 8), dpi=600)
+    # Plot maps; start with countries not included, then countries with values
+    col_list = ['abs_diff_A', 'abs_diff_C', 'abs_diff_D', 'abs_diff_F']
+    captions = ['(a) A-segment (mini)', '(b) C-segment (medium)',
+                '(c) D-segment (large)', '(d) F-segment (luxury)']
+
+    if num_panels == 2:
+        # if only 2 panels are presented, present segments A and F
+        nrows = 1
+        col_list = [col_list[0]] + [col_list[-1]]
+        captions = [captions[0]] + [captions[-1]]
+        figsize= (9.5, 5)
+    elif num_panels == 4:
+        # present all segments
+        nrows = 2
+        figsize= (9.5, 8)
+        orientation = 'vertical'
+
+    fig, axes = plt.subplots(nrows=nrows, ncols=2, sharex=True, sharey=True, squeeze=True,
+                           gridspec_kw={'wspace': 0.03, 'hspace': 0.03}, figsize=figsize, dpi=600)
+
     gs1 = gridspec.GridSpec(2, 2)
     gs1.update(wspace=0.01, hspace=0.01)
 
-    # Plot maps; start with countries not included, then countries with values
-    col_list = ['abs_diff_A', 'abs_diff_C', 'abs_diff_D', 'abs_diff_F']
     threshold = boundaries[-2] / rmax  # threshold value to determine annotation text color
 
     for col, ax in zip(col_list, axes.flatten()):
@@ -973,9 +997,6 @@ def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
                       ei_countries=ei_countries)
 
     # Label panels
-    captions = ['(a) A-segment (mini)', '(b) C-segment (medium)',
-                '(c) D-segment (large)', '(d) F-segment (luxury)']
-
     for i, a in enumerate(fig.axes):
         a.annotate(captions[i], xy=(0.02, 0.92), xycoords='axes fraction', fontsize=12)
 
@@ -992,30 +1013,52 @@ def plot_fig4(exp, fp_figure, mapping_data, ICEV_total_impacts, export_figures, 
     cb = plt.cm.ScalarMappable(cmap=cmap_colors, norm=norm)
     cb.set_array([])
 
-    fig.subplots_adjust(right=0.8)
-    cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
-    cbar = fig.colorbar(cb, cax=cbar_ax, extend='both', spacing='proportional', ticks=[-5, 0, 5, 10, 15, 20, 25, 30])
-    cbar.set_label('Lifecycle CO$_2$ mitigated through electrification, \n t CO$_2$-eq/vehicle', rotation=90, labelpad=9, fontsize=12)
+    if num_panels == 2:
+        # horizontal colorbar (1x2 figure)
+        orientation = 'horizontal'
+        fig.subplots_adjust(bottom=0.2)
+        cbar_ax = fig.add_axes([0.13, 0.13, 0.76, 0.035])
+        rotation = 0
+        keeper = 'Fig_5_2p ' + exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+    elif num_panels == 4:
+        # for vertical colorbar (2x2 figure)
+        orientation = 'vertical'
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.815, 0.13, 0.025, 0.75])
+        rotation = 90
+        keeper = 'Fig_5_4p ' + exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+
+    ticks_lower = round_up_down(rmin, 5, 'up')
+    ticks_upper = round_up_down(rmax, 5, 'down')
+    ticks = [i for i in range(ticks_lower, ticks_upper+1, 5)]
+    cbar = fig.colorbar(cb, cax=cbar_ax, extend='both', spacing='proportional', ticks=ticks, orientation=orientation)
+    cbar.set_label('Lifecycle CO$_2$ mitigated through electrification, \n t CO$_2$-eq/vehicle', rotation=rotation, labelpad=9, fontsize=12)
     minorticks = np.arange(int(cbar.vmin), int(cbar.vmax) + 1, 1)
     minorticks = (minorticks - cbar.vmin) / (cbar.vmax - cbar.vmin)  # normalize minor ticks to [0,1] scale
-    cbar.ax.yaxis.set_minor_locator(FixedLocator(minorticks))
+    if num_panels == 2:
+        cbar.ax.xaxis.set_minor_locator(FixedLocator(minorticks))
+    elif num_panels == 4:
+        cbar.ax.yaxis.set_minor_locator(FixedLocator(minorticks))
     cbar.ax.tick_params(labelsize=9, pad=4)
 
     if export_figures:
-        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
-        plt.savefig(os.path.join(fp_figure, 'Fig 3- abs_diff ' + keeper), bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, keeper), bbox_inches='tight')
 
     plt.show()
 
-#%% Figure 4 - sensitivity with vehicle lifetimes
-def plot_fig4(results, export_figures, fp_figure=fp_results):
+#%% Figure 6 - sensitivity with vehicle lifetimes
+def plot_fig6(results, export_figures, fp_figure=fp_results):
     sns.set_style('whitegrid')
 
     clrs = ['#2e78b8','#206619', '#555c23', '#b8145b']  # colours for ICEV lines
     clrs2 = ['#4e7496', '#3F8638', '#737D2F', '#681E3E']  # colours for BEV ranges
-    fig_dict = {'baseline':['baseline', 'short_BEV_life', 'long_BEV_life'],
-                'ML':['Moro_Lonza','long_BEV_life_ML','short_BEV_life_ML']}
+    if results.shape[1] == 24:
+        fig_dict = {'baseline':['baseline', 'short_BEV_life', 'long_BEV_life']}
+    elif results.shape[1] > 24:
+        fig_dict = {'baseline':['baseline', 'short_BEV_life', 'long_BEV_life'],
+                'ga':['grid_avg','long_BEV_life_ga','short_BEV_life_ga']}
+
     for el_approach in fig_dict.keys():
         baseline, short_BEV_life, long_BEV_life = fig_dict[el_approach]
         fig, axes = plt.subplots(2, 2, figsize=(15, 8), gridspec_kw={'wspace': 0.05, 'hspace': 0.075}, sharex=True, sharey=True)
@@ -1100,6 +1143,7 @@ def plot_fig4(results, export_figures, fp_figure=fp_results):
 
 
 def sensitivity_plot_lecture(results, export_figures, fp_figure=fp_results):
+    # Reproduction of Figure 6 with larger text for presentation slides
     clrs = ['#2e78b8','#206619', '#555c23', '#b8145b']  # colours for ICEV lines
     clrs2 = ['#4e7496', '#3F8638', '#737D2F', '#681E3E']  # colours for BEV ranges
     fig, axes = plt.subplots(2, 2, figsize=(20, 11.5), gridspec_kw={'wspace': 0.05, 'hspace': 0.075}, sharex=True, sharey=True)
@@ -1192,6 +1236,68 @@ def sensitivity_plot_lecture(results, export_figures, fp_figure=fp_results):
 
     plt.show()
 
+#%% Plot country footprint with specific segment
+def plot_country_footprint(exp, fp_figure, country, segment, start, timestamp, mapping_data, export_figures):
+    """ Produce country footprint based on user query"""
+
+    # use same colour coding as for Figure 3 in paper
+    cmap = colors.ListedColormap(["#c6baca",  # light purple
+                                  "#83abce",
+                                  "#6eb668",
+                                  "#9caa41",
+                                  "#815137",
+                                  "#681e3e"  # red
+                                  ])
+    vmin=50
+    vmax=375
+    cmap_col = [cmap(i) for i in np.linspace(0, 1, 6)]  # retrieve colormap colors
+    cmap = cmap_col
+    boundaries = [i for i in np.arange(vmin, vmax, 50)]  # define boundaries of colormap transitions
+
+    cmap_BEV, norm = colors.from_levels_and_colors(boundaries, colors=[cmap[0]]+ cmap + [cmap_col[-1]], extend='both')
+
+    col_list = ['BEV footprint - Segment A - Consumption mix', 'BEV footprint - Segment C - Consumption mix',
+                'BEV footprint - Segment D - Consumption mix', 'BEV footprint - Segment F - Consumption mix']
+
+    col = [col for col in col_list if 'Segment '+ segment in col]
+    country_ind = mapping_data.loc[mapping_data['ISO_A2'] == country]
+    if country_ind[col].values >= (4/6*(vmax-vmin)):
+        color = 'grey'
+    else:
+        color = '#363737'
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4), dpi=600)
+    mapping_data.plot(ax=ax, color=color, edgecolor='darkgrey', linewidth=0.3)
+    country_ind.plot(ax=ax, column=col, cmap=cmap_BEV, norm=norm, edgecolor='k', linewidth=0.3, alpha=0.8)
+
+    plt.xlim((-12, 34))
+    plt.ylim((32, 75))
+
+    plt.yticks([])
+    plt.xticks([])
+
+    # add annotations
+    timestamp = timestamp.strftime('%Y-%m-%d %H:%M %z')
+    caption = f'Carbon footprint for segment {segment} BEV in {country} \n at {timestamp} (g CO$_2$e /vkm) \n (User query for {start})'
+    ax.annotate(caption, xy=(0.5, 1.02), xycoords='axes fraction', fontsize=9, ha='center')
+
+    annotate_map(ax,
+                country_ind[country_ind[col].notna()].index.to_list(),
+                country_ind,
+                country_ind[country_ind[col].notna()][col].values,
+                300,
+                threshold=0,
+                round_dig=0,
+                )
+
+    if export_figures:
+        keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
+        plt.savefig(os.path.join(fp_figure, 'Fig_1 ' + keeper + '.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(fp_figure, 'Fig_1 ' + keeper), bbox_inches='tight')
+
+    plt.show()
+
+
 #%% Optional figures for plotting
 
 def plot_el_trade(exp, fp_figure, CFEL, export_figures):
@@ -1216,35 +1322,43 @@ def plot_el_trade(exp, fp_figure, CFEL, export_figures):
     ax.yaxis.set_minor_locator(ticker.MultipleLocator(10))
     ax.tick_params(axis='y', which='major', labelsize=14)
 
-
+    # set up secondary axis for trade as % of production
+    trade_pct = CFEL['Trade percentage']*100
     ax2 = ax.twinx()
     ax2.set_xlim(ax.get_xlim())  # set up secondary y axis plot
 
     # semi-manually set y-axis extrema to align 0-value with primary y-axis
-    ax2_upper_y =  round_up_down(CFEL['trade percentage'].max(), 20, 'up')
-    ax2_lower_y =  ax2_upper_y * (ax.get_ylim()[0]/ax.get_ylim()[1])
-    ax2.set_ylim(top=ax2_upper_y, bottom=ax2_lower_y)
+    ax_neg_pct = abs(ax.get_ylim()[0]) / (abs(ax.get_ylim()[0]) + ax.get_ylim()[1])
+    ax_pos_pct = 1 - ax_neg_pct
+    ax2_upper_y =  trade_pct.max()
+    # this is just for spacing the 0 in the right place
+
+    ax2.set_ylim(top=(ax2_upper_y), bottom=-ax2_upper_y/ax_neg_pct)
+
+    # remove negative y ticks on secondary axis (trade as % of total prod)
+    ticks = [tick for tick in plt.gca().get_yticks() if tick >=0]
+    ax2.set_yticks(ticks)
+
     ax2.yaxis.set_major_formatter(ticker.PercentFormatter())
     ax2.yaxis.set_minor_locator(ticker.MultipleLocator(25))
     ax2.tick_params(axis='y', which='major', labelsize=14)
     ax2.tick_params(left=False, labelleft=False, bottom=False, labelbottom=False,
                 right=True, labelright=True)
-    ax2.set_ylabel('Trade, as percentage of total production (%)', fontsize=13)
+    ax2.set_ylabel('Gross trade, as percentage of total production (%)', labelpad=5, fontsize=14)
     ax2.set_facecolor('none')
 
     for _, spine in ax2.spines.items():
         spine.set_visible(False)
 
-
-    CFEL['trade percentage'].plot(kind='line', style='D', markersize=8, color='#99a63f', mec='k',
-        label='Trade, as % of total production [right axis]', grid=False, ax=ax2, alpha=0.8, fontsize=14)
+    trade_pct.plot(kind='line', style='D', markersize=8, color='#99a63f', mec='k',
+        label='Gross trade, as % of total production [right axis]', grid=False, ax=ax2, alpha=0.8, fontsize=13)
 
     handles, labels = ax.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
     order = [1, 2, 0, 3]  # manually arrange legend entries
-    handles = handles+handles2
-    labels = labels+labels2
-    plt.legend([handles[i] for i in order], [labels[i] for i in order], fontsize=14, frameon=True, facecolor='w', borderpad=1, loc=4, framealpha=1)
+    handles = handles + handles2
+    labels = labels +labels2
+    plt.legend([handles[i] for i in order], [labels[i] for i in order], fontsize=13, frameon=True, facecolor='w', borderpad=1, loc=4, framealpha=1)
 
     if export_figures:
         keeper = exp + " run {:%d-%m-%y, %H_%M}".format(datetime.now())
@@ -1260,7 +1374,7 @@ def trade_heatmap(trades):
     sns.heatmap(trades.replace(0, np.nan), square=True, linecolor='silver', linewidths=0.5, cmap='inferno_r')
 
 
-# %% Old figure 5 ((histogram with fleet size vs ICEV:BEV ratio))
+# %% Obsolete figure: histogram with fleet size vs ICEV:BEV ratio))
 
 def plot_fleet_histogram(exp, fp_figure, results, export_figures):
     # ## Trial: Make figure comparing car fleet and energy consumption
@@ -1286,7 +1400,7 @@ def plot_fleet_histogram(exp, fp_figure, results, export_figures):
     bin_x = np.cumsum(histogram['x'].tolist())
     bin_x = np.insert(bin_x, 0, [0]) / 1e6  # Change units of vehicles to millions
 
-    # Plot Figure 5
+    # Plot Figure
     txtsize = 14
     sns.set_style('whitegrid')
     fig = plt.figure(figsize=(16, 12))
@@ -1347,96 +1461,3 @@ def plot_fleet_histogram(exp, fp_figure, results, export_figures):
         plt.savefig(os.path.join(fp_figure, 'Fig_5 - ' + keeper + '.png'), bbox_inches='tight')
 
     plt.show()
-
-
-# %%
-
-# All figures plotted at once
-
-#def make_figures(map_data, col_plot, legend_title, min_value, max_value, lbl_div_size, cmap, title, midpoint="None", num_clr_divs="None"):
-#    if cmap=='RdBu_r':
-#        cmap = cm.get_cmap(cmap,11)
-#        newcmp = cmap
-#        newcmp.set_bad('white')
-#        map_data[col_plot] = map_data[col_plot].apply(lambda x: np.ma.masked_inside(x, 0.9,1.1))
-#    else:
-#        newcmp=cm.get_cmap(cmap,11)
-#
-## Calculate midpoint for non-normalized scales
-#    if midpoint=="None":
-#        midpoint = min_value + (max_value-min_value)/2 #midpoint is actually halfway through the range
-#    if num_clr_divs == "None":
-#        num_clr_divs = (max_value-min_value)/lbl_div_size
-#
-##Plot data
-#    ax = map_data.plot(column=col_plot, figsize=(16,12),cmap=newcmp, norm=MidpointNormalize(midpoint=midpoint, vmax=max_value, vmin=min_value),edgecolor='k')
-#    ax.set_title(title, fontsize=20, pad=20)
-#    ax.grid(False)
-#    fig = ax.get_figure()
-#    ax.set_yticklabels([])
-#    ax.set_xticklabels([])
-#
-## Colorbar/legend setup
-#    ax = plt.cm.ScalarMappable(cmap=newcmp, norm=MidpointNormalize(midpoint=midpoint, vmax=max_value, vmin=min_value))
-#    ax._A = []
-#    cbar = fig.colorbar(ax, extend='both')
-#    cbar.ax.set_ylabel(legend_title, rotation=90, labelpad=10)
-#
-#    plt.xlim((-12,34))
-#    plt.ylim((32,75))
-#
-#    if export_figures == True:
-#        keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-#        if ":" in col_plot:
-#            col_plot = col_plot.replace(":", "-")
-#
-#        plt.savefig(os.path.join(fp_figure,col_plot+keeper+'.pdf'), format='pdf', bbox_inches='tight')
-#        plt.savefig(os.path.join(fp_figure,col_plot+keeper), bbox_inches='tight')
-
-
-# %%
-
-# Print map-a-palooza
-#
-#"""RdYlGn_r"""""
-#max_BEV = round_up_down(results.values.max(), 10, "up")
-#min_BEV = round_up_down(results[results.columns[0:7]].values.min(),10,"down")
-#max_ratio = round_up_down(results[results.columns[8:15]].values.max()*10,5,"up")/10
-#min_ratio = round_up_down(results[results.columns[8:15]].values.min()*10,5,"down")/10
-#min_prod = round_up_down(BEV_prod_EU.values.min(),2,"down")
-#max_prod = round_up_down(BEV_prod_EU.values.max(),2,"up")
-#
-#for i, name in enumerate(col_names):
-#    if "RATIO" in name:
-#        #cmap = colors.LinearSegmentedColormap.from_list("", ["green","white","#FFFF00","orange","red","#8B0000","black"],15)
-#        make_figures(mapping_data,name,"Ratio, BEV-ICEV",min_ratio,max_ratio,0.2,'RdBu_r',"Ratio carbon intensity, BEV:ICEV, Segment "+segment_list[i],midpoint=1, num_clr_divs=11)
-#        #keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-#        #if export_data==True:
-#        #    plt.savefig(name+keeper, bbox_inches='tight')
-#      #  make_figures(min_ratio,max_ratio,0.5,cmap, "Ratio carbon intensity, BEV:ICEV",midpoint=1,num_clr_divs=15)#"RdYlGn_r","Ratio carbon intensity, BEV:ICEV",1)
-#    elif "Ratio" in name:
-#        make_figures(mapping_data,name,"Ratio, BEV:ICEV, domestic production",min_ratio,max_ratio,0.2,"RdBu_r","Ratio carbon intensity, BEV:ICEV, domestic production of segment "+segment_list[i]+" batteries",midpoint=1, num_clr_divs=11)
-#        #keeper = " run {:%d-%m-%y, %H_%M}".format(datetime.now())
-#        #if export_data==True:
-#         #   plt.savefig(name+keeper, bbox_inches='tight')
-#    elif "EUR production impacts" in name:
-#        make_figures(mapping_data,name,"Battery production impacts \n (t CO$_2$-eq/battery)",min_prod,max_prod,2,"viridis","domestic production of segment "+segment_list[i]+" batteries",num_clr_divs=11)
-#    elif "BEV footprint" in name:
-#        if "EUR production" in name:
-#            make_figures(mapping_data,name,"BEV footprint \n (g CO$_2$-eq/km)", min_BEV,max_BEV,50,cmap_BEV,"BEV lifecycle carbon intensity, domestic production of segment "+segment_list[i]+" batteries",num_clr_divs=11) #tab20b
-#        else:
-#            make_figures(mapping_data,name,"BEV footprint \n (g CO$_2$-eq/km)", min_BEV,max_BEV,50,cmap_BEV,"BEV lifecycle carbon intensity, Segment "+segment_list[i],num_clr_divs=11) #tab20b
-#    elif "Use phase" in name:
-#        make_figures(mapping_data,name,"Ratio use phase only, BEV:ICEV",min_ratio,max_ratio,0.5,"RdBu_r","Use phase ratio carbon intensity, Segment "+segment_list[i],midpoint=1, num_clr_divs=11)
-#
-#    #plt.xlim((-12,32))
-#    #plt.ylim((32,72))
-
-
-# %%
-
-#
-#for i, name in enumerate(col_names):
-#    if "BEV footprint" in name:
-#        if "EUR production" in name:
-#            make_figures(mapping_data,name,"BEV footprint \n (g CO2-eq/km)", min_BEV,max_BEV,50,"tab20b","BEV lifecycle carbon intensity, domestic production of segment "+segment_list[i]+" batteries",num_clr_divs=15) #tab20b
