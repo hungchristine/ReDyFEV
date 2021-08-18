@@ -1,10 +1,9 @@
 # ReDyFEV
 
-A  Python library for calculating the lifecycle climate impacts of battery electric vehicles in Europe
+A Python module for calculating the ***Re***gionalized ***Dy***namic lifecycle climate ***F***ootprints of battery ***E***lectric ***V***ehicles in Europe
 
 
 ## Description
-
 This package contains the code required to run the data retrieval from the ENTSO-E Transparency Platform, perform electricity mix and 
 BEV footprint calculations, and visualizations in the manuscript entitled "Regionalized climate footprints of battery electric vehicles".  
 
@@ -29,7 +28,7 @@ Users can modify a number of parameters to tailor their analysis, opt out of que
 
 Experiment parameters are defined in `main.py`. Experiment parameters include:
 * time period for analysis (query ENTSO-E)
-* in the case of a footprint analysis (single-country, "intstantenous" footprint), country and vehicle segment
+  * in the case of a footprint analysis (single-country, "intstantenous" footprint), country and vehicle segment
 * electricity consumption mix calculation approach (flow-tracing or grid average)
 * lifetime in km, BEV and ICEV
 * allocation of battery production emissions to second-life applications
