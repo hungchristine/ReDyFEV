@@ -50,6 +50,7 @@ The files containing data from external sources for the calculations and visuali
   * maps data from [Natural Earth](https://www.naturalearthdata.com/)
   
 The output files containing results from intermediate calculations and that are required to run the modules individually (i.e., not via `main.py`) are provided in the `\output` folder. 
+  * cached queries results to ENTSO-E Transparency Portal API (`\output\entsoe`)
   * pickle files of each intermediate step (calculating electricity mixes and their footprint, vehicle footprints)
   * logs of missing emission factors
 
