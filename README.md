@@ -14,7 +14,7 @@ Note that querying the [ENTSO-E Transparency Portal](https://transparency.entsoe
 
 ## Dependencies
 * [bentso](https://github.com/BONSAMURAIS/bentso)
-* [pylcaio](https://github.com/MaximeAgez/pylcaio)
+* [pylcaio 1.0](https://github.com/MaximeAgez/pylcaio/releases/tag/v1.0)
 * [country_converter](https://github.com/konstantinstadler/country_converter)
 * geopandas
 * pandas
