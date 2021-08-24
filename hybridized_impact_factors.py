@@ -12,7 +12,7 @@ fp_output = os.path.join(os.path.curdir, 'output')
 
 def hybrid_emission_factors(trade_only, year):
     # append pylcaio folder with hybridized LCI processes
-    sys.path.append((os.path.join(os.getcwd(), '..','..', 'Data', 'hybridized LCA factors','pylcaio-master','pylcaio-master','src')))
+    sys.path.append((os.path.join(os.getcwd(), '..', 'hybridized LCA factors','pylcaio-master','pylcaio-master','src')))
     # sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
     import pylcaio
     Analysis = pylcaio.Analysis('ecoinvent3.5','exiobase3', method_double_counting='STAM', capitals=False)
@@ -253,7 +253,7 @@ def hybrid_emission_factors(trade_only, year):
     ef_countries = ef_countries.T
     ef_countries.sort_index(axis=0, inplace=True)
 
-    entso_fp = os.path.join(fp_output, 'ENTSO_production_volumes_' + str(year) + '.csv')
+    entso_fp = os.path.join(fp_output, 'entsoe', 'ENTSO_production_volumes_' + str(year) + '.csv')
 
     entso_e_production = pd.read_csv(entso_fp, header=0, index_col=[0])
     entso_e_production.replace(0, np.nan,inplace=True)
@@ -340,11 +340,16 @@ def hybrid_emission_factors(trade_only, year):
 
     # Export to .csv for use in BEV_footprints_calculations
     # append extra countries to file
-    existing_tradeonly = pd.read_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'))['geography'].values
-    add_ef_countries = set(hv_mix_ef.index.get_level_values('geography')) - set(existing_tradeonly)  # countries not already in csv file
-    if add_ef_countries:
-        hv_mix_ef_exp = hv_mix_ef.loc[:,:,list(add_ef_countries),:]
-        hv_mix_ef_exp.to_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'), mode='a', header=False)  # used in BEV_footprints_calculations
+    try:
+        existing_tradeonly = pd.read_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'))['geography'].values
+        add_ef_countries = set(hv_mix_ef.index.get_level_values('geography')) - set(existing_tradeonly)  # countries not already in csv file
+        if add_ef_countries:
+            hv_mix_ef_exp = hv_mix_ef.loc[:,:,list(add_ef_countries),:]
+            hv_mix_ef_exp.to_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'), mode='a', header=False)  # used in BEV_footprints_calculations
+    except FileNotFoundError:
+        print('Previous ecoinvent file does not exist. Making file.')
+        hv_mix_ef.to_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'))
+
     ef_countries.to_csv(os.path.join(fp_output, 'country_emission_factors.csv'))  # used in clean_impact_factors
     no_ef.to_csv(os.path.join(fp_output, 'missing_emission_factors.csv'))  # used in clean_impact_factors
 #    lv_mix_ef.to_csv(os.path.join(fp_results, 'ecoinvent_ef_lv.csv'))
@@ -355,7 +360,6 @@ def clean_impact_factors(year, trade_only, calc_hybrid):
     entsoe_fp = os.path.join(fp_output, 'entsoe')
     with open(os.path.join(entsoe_fp, 'gen_final_' + str(year) + '.pkl'), 'rb') as handle:
         gen_df = pickle.load(handle)
-    gen_df.replace(0, np.nan, inplace=True)
 
     with open(os.path.join(entsoe_fp,'trade_final_' + str(year) + '.pkl'), 'rb') as handle:
         trade_df = pickle.load(handle)
@@ -449,8 +453,6 @@ def clean_impact_factors(year, trade_only, calc_hybrid):
     # Export all data
     # .csv for use in BEV_footprints_calculations.py
 
-    trade_df.to_csv(os.path.join(fp_output,'trades_' + str(year) + '.csv'))
-    gen_df.to_csv(os.path.join(fp_output,'ENTSO_production_volumes_' + str(year) + '.csv'))
     ef.to_csv(os.path.join(fp_output,'final_emission_factors_' + str(year) + '.csv'))
 
     with pd.ExcelWriter(os.path.join(fp_results, 'entsoe_export_final_' + str(year) + '.xlsx')) as writer:
