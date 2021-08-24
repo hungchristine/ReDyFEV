@@ -13,7 +13,7 @@ BEV footprint calculations, and visualizations in the manuscript entitled "Regio
 Note that querying the [ENTSO-E Transparency Portal](https://transparency.entsoe.eu/) requires an API key, which is added to the environment in `bentso_extract.py`
 
 ## Dependencies
-* [bentso](https://github.com/BONSAMURAIS/bentso)
+* [bentso](https://github.com/BONSAMURAIS/bentso) (modified, see [here](https://github.com/BONSAMURAIS/bentso/pull/8))
 * [pylcaio 1.0](https://github.com/MaximeAgez/pylcaio/releases/tag/v1.0)
 * [country_converter](https://github.com/konstantinstadler/country_converter)
 * geopandas
