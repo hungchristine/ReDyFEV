@@ -6,16 +6,13 @@ import numpy as np
 import os, sys
 import pickle
 import logging
+import pylcaio
 
 fp_results = os.path.join(os.path.curdir, 'results')
 fp_output = os.path.join(os.path.curdir, 'output')
 
 def hybrid_emission_factors(trade_only, year):
-    # append pylcaio folder with hybridized LCI processes
-    sys.path.append((os.path.join(os.getcwd(), '..', 'hybridized LCA factors','pylcaio-master','pylcaio-master','src')))
-    # sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
-    import pylcaio
-    Analysis = pylcaio.Analysis('ecoinvent3.5','exiobase3', method_double_counting='STAM', capitals=False)
+    Analysis = pylcaio.Analysis('ecoinvent3.5','exiobase3', method_double_counting='STAM')
 
     # For making human-readable indices; consists of all ecoinvent process metadata
     labels = Analysis.PRO_f
