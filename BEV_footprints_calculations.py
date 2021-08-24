@@ -20,7 +20,6 @@ the carbon footprint of electric vehicles
   - trade_ef_hv.csv (from hybridized_impact_factors.py)
   - API_EG.ELC.LOSS.ZS_DS2_en_csv_v2_673578.csv (transmission losses, from OECD)
   - car_specifications.xlsx
-  - road_eqs_carage.xls
 """
 import os
 from datetime import datetime

@@ -18,7 +18,6 @@
 #      - country-specific indirect_BEV_impacts_consumption.pkl (from BEV_footprints_calculation.py)
 #      - country-specific indirect_ICEV_impacts.pkl (from BEV_footprints_calculation.py)
 #      - label_pos.csv
-#     - road_eqs_carage.xls
 
 # %% Import packages
 
