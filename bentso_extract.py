@@ -4,10 +4,7 @@
  Export
 """
 
-# import appdirs
-# import hashlib
 import os
-import pandas as pd
 import numpy as np
 import pickle
 
@@ -19,25 +16,28 @@ from bentso import iterators
 from bentso import CachingDataClient
 
 
-cl = CachingDataClient(location=r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Submission files\code\data')
-#os.environ['ENTSOE_API_TOKEN'] = '52585baf-3014-41c2-92f8-11bfc769343b' #<insert ENTSO-E API token here>
+entsoe_fp = os.path.abspath(os.path.join(os.path.curdir, 'output','entsoe'))
+# entsoe_fp = r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Submission files\code\data'
+cl = CachingDataClient(location=entsoe_fp, verbose=True)
+
+os.environ['ENTSOE_API_TOKEN'] = '52585baf-3014-41c2-92f8-11bfc769343b' #<insert ENTSO-E API token here>
 fp = os.path.abspath(os.path.curdir)
-fp_output = os.path.join(os.path.curdir, 'output')
+fp_output = os.path.join(os.path.curdir, 'output', 'entsoe')
 
 # #### Using Bentso
 
 country_list = ['AL', 'AT', 'BA', 'BE', 'BG',
-                 'CH', 'CZ', 'DE', 'DK', 'EE',
-                 'ES', 'FI', 'FR', 'GR', 'HR',
-                 'HU', 'IE', 'IT', 'LT', 'LU',
-                 'LV', 'ME', 'MK', 'NL', 'NO',
-                 'PL', 'PT', 'RO', 'RS', 'SE',
-                 'SI', 'SK', 'GB', 'TR', 'GE',
-                 'CY', 'HR', 'NI', 'GB-NIR',
-                 'BY', 'UA', 'MD', 'RU', 'MT', 'MD']
+                  'CH', 'CZ', 'DE', 'DK', 'EE',
+                  'ES', 'FI', 'FR', 'GR', 'HR',
+                  'HU', 'IE', 'IT', 'LT', 'LU',
+                  'LV', 'ME', 'MK', 'NL', 'NO',
+                  'PL', 'PT', 'RO', 'RS', 'SE',
+                  'SI', 'SK', 'GB', 'TR', 'GE',
+                  'CY', 'HR', 'NI', 'GB-NIR',
+                  'BY', 'UA', 'MD', 'RU', 'MT', 'MD']
 
 # smaller group for testing
-#country_list = ['AT']#,'FR', 'NO', 'AT']  # ,'DK','IT']
+# country_list = ['AT']#,'FR', 'NO', 'AT']  # ,'DK','IT']
 
 """Fetch production mixes from Transparency Platform
    saves as dict of Dataframes.
@@ -60,6 +60,7 @@ def fetch_generation(year=2019, full_year=True):
             gen_dict[country] = cl.get_generation(country, year, full_year=full_year)
         except Exception as e:
             print(f'Warning: no data for generation in {country}!')
+            print(e)
             logging.warning(f'No generation data for {country}')
             logging.warning(e)
     with open(r'entso_export_gen_' + str(year) + '.pkl', 'wb') as handle:
@@ -98,6 +99,4 @@ def bentso_query(year=2019, full_year=True):
 
     os.chdir(fp)
 
-    return gen_dict#, trade_dict
-
-#gen_dict = bentso_query()
+    return gen_dict

@@ -1,5 +1,6 @@
-# The original code requires pylcaio, from Agez, found at:
+# The original code requires pylcaio release v1.0, from Agez, found at:
 # https://github.com/MaximeAgez/pylcaio
+
 import pandas as pd
 import numpy as np
 import os, sys
@@ -11,7 +12,8 @@ fp_output = os.path.join(os.path.curdir, 'output')
 
 def hybrid_emission_factors(trade_only, year):
     # append pylcaio folder with hybridized LCI processes
-    sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
+    sys.path.append((os.path.join(os.getcwd(), '..','..', 'Data', 'hybridized LCA factors','pylcaio-master','pylcaio-master','src')))
+    # sys.path.append(r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Data\hybridized LCA factors\pylcaio-master\pylcaio-master\src')
     import pylcaio
     Analysis = pylcaio.Analysis('ecoinvent3.5','exiobase3', method_double_counting='STAM', capitals=False)
 
@@ -98,7 +100,7 @@ def hybrid_emission_factors(trade_only, year):
                 'Fossil Gas': 'natural gas',
                 'Fossil Hard coal': 'hard coal',
                 'Fossil Oil': ' oil',
-                'Fossil Oil shale': '--',  #' oil?'
+                'Fossil Oil shale': '--',
                 'Fossil Peat': 'peat',
                 'Geothermal': 'geothermal',
                 'Hydro Pumped Storage': 'pumped storage',
@@ -148,7 +150,7 @@ def hybrid_emission_factors(trade_only, year):
 
     # Get list of solar PV processes in ecoinvent
     d = list(set(df_solar.index.get_level_values(level=1)))
-    pv = [entry for entry in d if 'electricity production' in entry] #all low-voltage production technologies
+    pv = [entry for entry in d if 'electricity production' in entry]  # all low-voltage production technologies
 
     # Fetch waste incineration process names
     waste = ['electricity, from municipal waste incineration to generic market for electricity, medium voltage']
@@ -170,12 +172,12 @@ def hybrid_emission_factors(trade_only, year):
                 match_keys.append(temp_tecdict[keyword])
                 num_matches[keyword] += 1
 
-    display(num_matches)
+    print(num_matches)
 
     # Find ecoinvent tecs that were not matched
     if len(ecoinvent_tecs)-len(matches) > 0:
         print('ecoinvent process(es) not matched:')
-        display(set(ecoinvent_tecs).difference(set(matches)))
+        print(set(ecoinvent_tecs).difference(set(matches)))
 
     # Correspondence of ENTSO-E categories and specific ecoinvent processes
     from collections import defaultdict
@@ -337,31 +339,45 @@ def hybrid_emission_factors(trade_only, year):
         ef_aggregated.to_excel(writer, sheet_name='mean tech fps')
 
     # Export to .csv for use in BEV_footprints_calculations
-    hv_mix_ef.to_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'))  # used in BEV_footprints_calculations
+    # append extra countries to file
+    existing_tradeonly = pd.read_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'))['geography'].values
+    add_ef_countries = set(hv_mix_ef.index.get_level_values('geography')) - set(existing_tradeonly)  # countries not already in csv file
+    if add_ef_countries:
+        hv_mix_ef_exp = hv_mix_ef.loc[:,:,list(add_ef_countries),:]
+        hv_mix_ef_exp.to_csv(os.path.join(fp_output, 'ecoinvent_ef_hv.csv'), mode='a', header=False)  # used in BEV_footprints_calculations
     ef_countries.to_csv(os.path.join(fp_output, 'country_emission_factors.csv'))  # used in clean_impact_factors
     no_ef.to_csv(os.path.join(fp_output, 'missing_emission_factors.csv'))  # used in clean_impact_factors
 #    lv_mix_ef.to_csv(os.path.join(fp_results, 'ecoinvent_ef_lv.csv'))
 
+    return ef_countries, no_ef, countries_missing_ef
 
-    return ef_countries, no_ef
-
-def clean_impact_factors(year, trade_only):
-    with open(os.path.join(fp_output, 'gen_final_' + str(year) + '.pkl'), 'rb') as handle:
+def clean_impact_factors(year, trade_only, calc_hybrid):
+    entsoe_fp = os.path.join(fp_output, 'entsoe')
+    with open(os.path.join(entsoe_fp, 'gen_final_' + str(year) + '.pkl'), 'rb') as handle:
         gen_df = pickle.load(handle)
     gen_df.replace(0, np.nan, inplace=True)
 
-    with open(os.path.join(fp_output,'trade_final_' + str(year) + '.pkl'), 'rb') as handle:
+    with open(os.path.join(entsoe_fp,'trade_final_' + str(year) + '.pkl'), 'rb') as handle:
         trade_df = pickle.load(handle)
 
-    try:
-        print('Calculating hybridized emission factors from pyLCAIO')
-        # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
-        ef, missing_factors = hybrid_emission_factors(trade_only, year)
-    except:
-        print('Calculating from pyLCAIO failed. Importing previously calculated emission factors instead')
-        # import ready-calculated emission factors if no access to pylcaio object
+    if calc_hybrid:
+        try:
+            print('\n Calculating hybridized emission factors from pyLCAIO')
+            # gen_df not modified in hybrid_emission_factors, just used to determine relevant labels
+            ef, missing_factors, countries_missing_ef = hybrid_emission_factors(trade_only, year)
+        except Exception as e:
+            print('\n Calculating from pyLCAIO failed. Importing previously calculated emission factors instead')
+            print(e)
+            # import ready-calculated emission factors if no access to pylcaio object
+            ef = pd.read_csv(os.path.join(fp_output, 'country_emission_factors.csv'), index_col=[0])
+            missing_factors = pd.read_csv(os.path.join(fp_output, 'missing_emission_factors.csv'), index_col=[0])
+    else:
+        print('\n Loading previously calculated emission factors')
         ef = pd.read_csv(os.path.join(fp_output, 'country_emission_factors.csv'), index_col=[0])
         missing_factors = pd.read_csv(os.path.join(fp_output, 'missing_emission_factors.csv'), index_col=[0])
+
+    countries_missing_ef = dict((k, list(v.dropna())) for k, v in missing_factors.iteritems())  # make dict of tec: [countries]
+    countries_missing_ef = {key:value for key, value in countries_missing_ef.items() if len(value)}  # remove entries with empty values
 
     """ Fix missing emission factors """
     # Note that these disregard whether or not there is actual production
@@ -372,6 +388,7 @@ def clean_impact_factors(year, trade_only):
     # Put in proxy for missing regions and technologies
     missing_factors.dropna(how='all', axis=1, inplace=True)
     missing_factors_dict = {}
+    # build dict of missing technology-country factors
     for tec, col in missing_factors.iteritems():
         missing_factors_dict[tec] = list(col.dropna(how='any', axis=0).values)
 
@@ -440,3 +457,5 @@ def clean_impact_factors(year, trade_only):
         trade_df.to_excel(writer, 'trade')
         gen_df.to_excel(writer, 'generation')
         ef.to_excel(writer,'new ef')
+
+    return countries_missing_ef
