@@ -54,9 +54,9 @@ def load_prep_el_data(fp, year):
     fp_output = os.path.join(fp, 'output')
 
     # Output from bentso.py
-    filepath_production = os.path.join(fp_output, 'ENTSO_production_volumes_'+ str(year) +'.csv')
+    filepath_production = os.path.join(fp_output, 'entsoe', 'ENTSO_production_volumes_'+ str(year) +'.csv')
     filepath_intensities = os.path.join(fp_output, 'final_emission_factors_'+ str(year) +'.csv')
-    filepath_trades = os.path.join(fp_output, 'trades_'+ str(year) +'.csv')
+    filepath_trades = os.path.join(fp_output, 'entsoe', 'trades_'+ str(year) +'.csv')
 
     filepath_tradeonly_ef = os.path.join(fp_output, 'ecoinvent_ef_hv.csv')
 

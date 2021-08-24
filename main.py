@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     # Define experiment running parameters
     new_query = 0  # trigger for re-querying ENTSO-E database (takes time!)
-    calc_hybrid = 0 # trigger for re-calculating hybridized impact factors (takes time!); 'fresh start' runs need value 1
+    calc_hybrid = 1 # trigger for re-calculating hybridized impact factors (takes time!); 'fresh start' runs need value 1
     segments = ['A', 'C', 'JC', 'JE', 'mini', 'medium', 'compact SUV', 'mid-size SUV']  # valid entries for segment
     segment_dict = {'mini': 'A', 'medium':'C', 'compact SUV':'JC', 'mid-size SUV':'JE'} # long-form to short form segments
 
