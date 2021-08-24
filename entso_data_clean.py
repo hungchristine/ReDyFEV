@@ -4,7 +4,6 @@
  data and fills in missing data
 """
 import pandas as pd
-import numpy as np
 from datetime import datetime, date, time, timezone, timedelta
 import pickle
 import os
@@ -61,19 +60,19 @@ def aggregate_entso(dictionary, start=None, end=None, start2=None):
                 print('Ran into a problem!')
                 print(e)
                 raise
-
             value = value_tmp
 #        try:
         if isinstance(value, pd.DataFrame) or isinstance(value, pd.Series):
-            # we don't need timesteps if we have a single time period
+            # we don't need timesteps if we have a single time period (i.e., footprint analysis)
             for i in range(0, value.shape[0]-1):
                 try:
                     timestep = (value.index[i+1] - value.index[i]).total_seconds() / 3600  # get timestep in hours
                     timestep_list.append(timestep)
                 except IndexError:
                     print(f'IndexError {i}')
-                except:
+                except Exception as e:
                     print('Could not perform!')
+                    print(e)
 
             # Make sure timesteps are all equal length before calculating
             # NB: this is made obsolete by using bentso's fullyear=True
@@ -123,7 +122,7 @@ def build_trade_mat(trade_dict):
 
 def clean_entso(year=None, start=None, end=None, country=None):
     fp = os.path.abspath(os.path.curdir)
-    fp_output = os.path.join(os.path.curdir, 'output')
+    fp_output = os.path.join(os.path.curdir, 'output', 'entsoe')
     os.chdir(fp_output)
 
     ## Load previous results
