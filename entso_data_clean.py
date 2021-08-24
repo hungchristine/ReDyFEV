@@ -4,6 +4,7 @@
  data and fills in missing data
 """
 import pandas as pd
+import numpy as np
 from datetime import datetime, date, time, timezone, timedelta
 import pickle
 import os
@@ -196,10 +197,15 @@ def clean_entso(year=None, start=None, end=None, country=None):
     for count in add_countries:
         gen_df.loc[count] = 0
 
+    gen_df.replace(0, np.nan, inplace=True)
+
     with open(r'trade_final_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(trade_df, handle)
     with open(r'gen_final_' + str(year) + '.pkl', 'wb') as handle:
         pickle.dump(gen_df, handle)
+
+    trade_df.to_csv('trades_' + str(year) + '.csv')
+    gen_df.to_csv('ENTSO_production_volumes_' + str(year) + '.csv')
 
     logging.info('Completed export of ENTSO-E data')
     os.chdir(fp)
