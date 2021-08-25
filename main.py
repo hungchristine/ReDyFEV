@@ -267,6 +267,7 @@ if __name__ == "__main__":
                 sens_batt_energy.to_excel(writer, 'Table S12', startrow=2)
                 results_lifetime_sensitivity.round(0).to_excel(writer, 'Table S13', startrow=2)
                 results_ga.round(0).to_excel(writer, 'Table S14', startrow=2)
+                sens_ellingsen.to_excel(writer, 'Table S15', startrow=2)
 
                 for sheet, caption in excel_dict2.items():
                     worksheet = writer.sheets[sheet]
