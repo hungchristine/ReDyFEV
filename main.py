@@ -77,10 +77,6 @@ if __name__ == "__main__":
                         'baseline_energy': {'BEV_life':180000, 'ICE_life':180000, 'flowtrace':True, 'allocation':True, 'energy_scen':'Gigafactory'},
                         'long_BEV_life_energy': {'BEV_life':250000, 'ICE_life':180000, 'flowtrace':True, 'allocation':True, 'energy_scen':'Gigafactory'},
                         'short_BEV_life_energy': {'BEV_life':150000, 'ICE_life':180000, 'flowtrace':True, 'allocation':True, 'energy_scen':'Gigafactory'},
-                        'baseline_Ellingsen': {'BEV_life':180000, 'ICE_life':180000, 'flowtrace':True, 'allocation':True, 'energy_scen':'Ellingsen 2016'},
-                        'baseline_Ellingsen_alloc': {'BEV_life':180000, 'ICE_life':180000, 'flowtrace':True, 'allocation':False, 'energy_scen':'Ellingsen 2016'},
-                        'long_BEV_life_Ellingsen': {'BEV_life':250000, 'ICE_life':180000, 'flowtrace':True, 'allocation':True, 'energy_scen':'Ellingsen 2016'},
-                        'short_BEV_life_Ellingsen': {'BEV_life':150000, 'ICE_life':180000, 'flowtrace':True, 'allocation':True, 'energy_scen':'Ellingsen 2016'},
                         'baseline_alloc': {'BEV_life':180000, 'ICE_life':180000, 'flowtrace':True, 'allocation':False, 'energy_scen':False},
                         'long_BEV_life_alloc': {'BEV_life':250000, 'ICE_life':180000, 'flowtrace':True, 'allocation':False, 'energy_scen':False},
                         'short_BEV_life_alloc': {'BEV_life':150000, 'ICE_life':180000, 'flowtrace':True, 'allocation':False, 'energy_scen':False},
@@ -91,7 +87,6 @@ if __name__ == "__main__":
     sensitivity_groups = {'baseline':['baseline', 'long_BEV_life', 'short_BEV_life'],
                           'grid_average': ['grid_avg', 'long_BEV_life_ga', 'short_BEV_life_ga'],
                           'batt_energy': ['baseline_energy', 'long_BEV_life_energy', 'short_BEV_life_energy'],
-                          'ellingsen': ['baseline_Ellingsen', 'long_BEV_life_Ellingsen', 'short_BEV_life_Ellingsen'],
 						  'no_alloc': ['baseline_alloc', 'long_BEV_life_alloc', 'short_BEV_life_alloc']
 						  }
 
@@ -261,14 +256,10 @@ if __name__ == "__main__":
             sens_batt_energy = pd.concat([all_exp_results['baseline_energy'].round(0), df], axis=1)
             sens_batt_energy.columns = pd.MultiIndex.from_product([['Footprint g CO2e/km', '% change from baseline'], df.columns])
 
-            sens_ellingsen = pd.concat([all_exp_results['baseline_Ellingsen'].round(0), df], axis=1)
-            sens_ellingsen.columns = pd.MultiIndex.from_product([['Footprint g CO2e/km', '% change from baseline'], df.columns])
-
             # dict of captions for each sheet
             excel_dict2 = {'Table S12': 'Sensitivity with alternative battery production electricity. Footprint with lower electricity demand and % change from baseline',
                            'Table S13': 'Data for Figure 7. Sensitivity with differing vehicle lifetimes for BEVs and ICEVs. Lifecycle carbon intensity, in g CO2e/vkm.',
-                           'Table S14': 'BEV footprints using grid-average approach from Moro and Lonza (2018) to calculate electricity mix footprint, in g CO2e/vkm',
-                           'Table S15': 'Sensitivity with Ellingsen 2016 battery production electricity values. Footprint with lower electricity demand and % change from baseline'}
+                           'Table S14': 'BEV footprints using grid-average approach from Moro and Lonza (2018) to calculate electricity mix footprint, in g CO2e/vkm'}
 
             book = openpyxl.load_workbook(SI_fp)
             with pd.ExcelWriter(SI_fp, engine="openpyxl") as writer:
@@ -289,7 +280,7 @@ if __name__ == "__main__":
 
                     worksheet.row_dimensions[1].height = 60
 
-                    if sheet == 'Table S12' or sheet == 'Table S15':
+                    if sheet == 'Table S12':
                         for col in ['F','G','H','I']:
                             for row in range(worksheet.min_row, worksheet.max_row + 1):
                                 worksheet[col + str(row)].number_format = '#0%'
