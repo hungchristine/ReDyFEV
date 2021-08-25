@@ -502,7 +502,7 @@ def export_SI(run_id, results_toSI, production, trades, C, CFEL, no_ef_countries
                   'Table S2 - intensity matrix':'Regionalized lifecycle carbon intensities of electricity generation technologies in g CO2-eq/kWh. Shaded cells indicate proxy data used (see Methods)',
                   'Table S3 - Production mix': ' Electricity generation mixes (2020), in TWh',
                   'Table S4 - trades': 'Trades between studied countries (2020), in TWh/year. Countries denoted in red italics are trade-only and do not have production data from ENTSO-E; ecoinvent values for production mix used for these.',
-                  'Table S5 - trade shares':'Total (gross) electricity traded, total imports of electricity and total exports of electricity relative to domestic production. Used in colorbar, Figure 2',
+                  'Table S5 - trade shares':'Total (gross) electricity traded, total imports of electricity and total exports of electricity. Relative to domestic production. Used in colorbar, Figure 2 and Figure 1, Supplementary Information',
                   'Table S6 - BEV fp':'Data from Figure 3 in manuscript. BEV carbon intensities in (g CO2-eq/km) for consumption electricity mix',
                   'Table S7 - Prod share of fp':'Data from Figure 4 in manuscript. Contribution of vehicle production emissions to total carbon footprint',
                   'Table S8 - Abs BEV impacts':'Data used in Figure 5 in manuscript. Regionalized total lifecycle emissions from BEV in t CO2-eq, with 180 000 km lifetime, using consumption mixes',
@@ -669,6 +669,11 @@ def export_SI(run_id, results_toSI, production, trades, C, CFEL, no_ef_countries
                                              {'type':'formula',
                                               'criteria': f'=COUNTIF($B5,"{country}")',
                                               'format': ital_red})
+        if sheet.find('Table S5') >= 0:
+            worksheet.set_column('B:U', 11)
+            for col_num, text_header in enumerate(production.columns.values):
+                worksheet.write(2, 1+col_num, text_header, df_header)
+            worksheet.set_row(2, 30)  # adjust row height to accomodate wrapped text
 
         if sheet.find('Table S11') >= 0:
             worksheet.set_column('F:G', None, pct_format)
