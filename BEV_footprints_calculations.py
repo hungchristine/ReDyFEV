@@ -671,7 +671,7 @@ def export_SI(run_id, results_toSI, production, trades, C, CFEL, no_ef_countries
                                               'format': ital_red})
         if sheet.find('Table S5') >= 0:
             worksheet.set_column('B:U', 11)
-            for col_num, text_header in enumerate(production.columns.values):
+            for col_num, text_header in enumerate(trade_pct_toSI.columns.values):
                 worksheet.write(2, 1+col_num, text_header, df_header)
             worksheet.set_row(2, 30)  # adjust row height to accomodate wrapped text
 
