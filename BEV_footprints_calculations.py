@@ -301,7 +301,7 @@ def BEV_calcs(fp, country_el, production, elmixes, BEV_lifetime, ICEV_lifetime, 
     # read in data
     fp_data = os.path.join(fp, 'data')
     vehicle_fp = os.path.join(fp_data, 'car_specifications.xlsx')
-    cars = pd.read_excel(vehicle_fp, index_col=[0, 1, 2], usecols='A:G')
+    cars = pd.read_excel(vehicle_fp, sheet_name='veh_emiss', index_col=[0, 1, 2], usecols='A:G')
     cars = cars.sort_index()
     vehicle_CO2 = ["BEV", "ICEV"]
 

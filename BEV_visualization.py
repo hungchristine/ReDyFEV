@@ -96,6 +96,8 @@ def setup(experiment):
 
     if not os.path.exists(fp_results):
         os.mkdir(fp_results)
+    if not os.path.exists(fp_figure):
+        os.mkdir(fp_figure)
     if not os.path.exists(fp_experiment):
         os.mkdir(fp_experiment)
 
