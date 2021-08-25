@@ -1679,6 +1679,7 @@ def plot_el_trade(exp, fp_figure, CFEL, export_figures):
     plot_trades = pd.DataFrame([CFEL['imports'], -CFEL['exports'], CFEL['imports'] - CFEL['exports']])
     plot_trades.index = ['Imports', 'Exports', 'Net trade']
     plot_trades = plot_trades.T
+    plot_trades.sort_index(axis=0, inplace=True)
 
     fig, ax = plt.subplots()
 

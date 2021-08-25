@@ -474,6 +474,7 @@ def export_SI(run_id, results_toSI, production, trades, C, CFEL, no_ef_countries
     CFEL_toSI = CFEL[['Production mix intensity', 'Consumption mix intensity']]
     CFEL_toSI = CFEL_toSI.round(0)
     CFEL_toSI.loc[drop_countries, 'Consumption mix intensity'] = '-'  # remove ecoinvent-based countries
+    CFEL_toSI.sort_index(inplace=True)
 
     country_intensities = C.round(0).fillna(value='-').T
     country_intensities.drop(index=drop_countries, inplace=True)
@@ -489,7 +490,7 @@ def export_SI(run_id, results_toSI, production, trades, C, CFEL, no_ef_countries
     trade_pct = CFEL['Trade percentage, gross']
     trade_pcti = CFEL['Import percentage']
     trade_pcte = CFEL['Export percentage']
-    trade_pct_toSI = pd.concat([trade_pct, trade_pcti, trade_pcte])
+    trade_pct_toSI = pd.concat([trade_pct, trade_pcti, trade_pcte], axis=1)
     trade_pct_toSI.replace(np.inf, np.nan, inplace=True)
     trade_pct_toSI.dropna(how='all', inplace=True)
 
