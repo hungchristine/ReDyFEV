@@ -17,7 +17,6 @@ from bentso import CachingDataClient
 
 
 entsoe_fp = os.path.abspath(os.path.join(os.path.curdir, 'output','entsoe'))
-# entsoe_fp = r'C:\Users\chrishun\Box Sync\000 Projects IndEcol\90088200 EVD4EUR\X00 EurEVFootprints\Submission files\code\data'
 cl = CachingDataClient(location=entsoe_fp, verbose=True)
 
 os.environ['ENTSOE_API_TOKEN'] =  #<insert ENTSO-E API token here>
