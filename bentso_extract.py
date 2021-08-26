@@ -20,6 +20,7 @@ entsoe_fp = os.path.abspath(os.path.join(os.path.curdir, 'output','entsoe'))
 cl = CachingDataClient(location=entsoe_fp, verbose=True)
 
 os.environ['ENTSOE_API_TOKEN'] =  #<insert ENTSO-E API token here>
+
 fp = os.path.abspath(os.path.curdir)
 fp_output = os.path.join(os.path.curdir, 'output', 'entsoe')
 
