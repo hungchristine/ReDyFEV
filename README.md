@@ -57,4 +57,4 @@ The output files containing results from intermediate calculations and that are 
 The `\results` folder contains Excel files of intermediate output for troubleshooting, and the SI-formatted results, and figures from the visualization. 
 
 ## License
-[Apache](https://www.apache.org/licenses/LICENSE-2.0)
+[BSD 3-Clause](https://choosealicense.com/licenses/bsd-3-clause/)
