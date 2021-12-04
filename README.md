@@ -58,3 +58,6 @@ The `\results` folder contains Excel files of intermediate output for troublesho
 
 ## License
 [BSD 3-Clause](https://choosealicense.com/licenses/bsd-3-clause/)
+
+[![DOI](https://zenodo.org/badge/257874846.svg)](https://zenodo.org/badge/latestdoi/257874846)
+
